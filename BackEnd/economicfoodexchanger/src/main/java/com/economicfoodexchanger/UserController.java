@@ -26,6 +26,7 @@ public class UserController {
 
     @GetMapping("/id/{id}")
     public Optional<User> getByUserID(@PathVariable Integer id){
+        System.out.println("Hello    World");
         System.out.println("id = " + id);
         Optional<User> user = userDao.findById(id);
         return user;
