@@ -1,6 +1,5 @@
 package com.economicfoodexchanger.sharedpost.delivery;
 
-import com.economicfoodexchanger.sharedpost.SharedPost;
 import com.economicfoodexchanger.sharedpost.payment.Payment;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -32,8 +31,4 @@ public class Delivery {
     @ManyToOne(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     @JoinColumn(name = "payment_id", referencedColumnName = "id")
     private Payment payment;
-
-    @OneToOne
-    @JoinColumn(name = "sharedpost_id", referencedColumnName = "id")
-    private SharedPost sharedPost;
 }
