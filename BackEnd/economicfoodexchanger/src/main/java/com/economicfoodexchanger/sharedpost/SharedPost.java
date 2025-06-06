@@ -44,7 +44,4 @@ public class SharedPost {
     @OneToMany(mappedBy = "sharedPost")
     private List<Review> reviews;
 
-    @OneToOne
-    @JoinColumn(name = "delivery_id", referencedColumnName = "id")
-    private Delivery delivery;
 }
