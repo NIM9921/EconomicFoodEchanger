@@ -6,6 +6,11 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: '0.0.0.0', // Listen on all network interfaces
-    port: 5173,      // Specify the port
+    port: 5173,
+    allowedHosts: [
+      'ae9d-101-2-191-170.ngrok-free.app' // Add your ngrok domain here
+    ]
   },
 })
+
+

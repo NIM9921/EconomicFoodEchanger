@@ -1,52 +1,199 @@
+import { useState, useEffect } from 'react';
 import VegitableStoryCard from "./CardComponent";
 import VegitablePost, { VegitablePostProps } from "./VegitablePost";
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, CircularProgress, Card, CardContent, Skeleton } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import PersonIcon from '@mui/icons-material/Person';
 
+// Interface for the API response data
+interface StoryData {
+    id: number;
+    title: string;
+    discription: string;
+    image: string | null;
+    createdateandtime: string | null;
+    username: {
+        id: number;
+        name: string;
+        city: string;
+        address: string;
+        status: boolean;
+        nic: string;
+        mobileNumber: number;
+        username: string;
+        password: string;
+        roleList: Array<{
+            id: number;
+            name: string;
+        }>;
+    } | null;
+}
 
-const cardsDetails = [
-    {
-        title: "Red Chilies from Anuradhapura",
-        content: "Locally grown in the dry zone of Anuradhapura, these chilies are renowned for their intense heat and vibrant red color. The region’s arid climate and well-drained soil create perfect conditions for cultivating high-quality chilies, widely used in Sri Lankan cuisine to spice up curries, sambols, and condiments.",
-        user: "Mahaweli Farms",
-        photo: "https://images.unsplash.com/photo-1605027990121-cbae9e0642df?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-        category: "Crops"
-    },
-    {
-        title: "Organic Brinjals from Kurunegala",
-        content: "These fresh brinjals are cultivated in Kurunegala using eco-friendly methods such as organic fertilizers and natural pest control. Free from harmful chemicals, they’re grown sustainably with practices like crop rotation, making them a healthy choice for Sri Lankan curries and side dishes.",
-        user: "Green Lanka Organics",
-        photo: "https://images.unsplash.com/photo-1605027990121-cbae9e0642df?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-        category: "Crops"
-    },
-    {
-        title: "Nutritious Ceylon Spinach from Matale",
-        content: "Grown in the fertile soils of Matale’s small farms, Ceylon Spinach (Nivithi) is a nutrient-rich leafy green packed with vitamins A and C, iron, and calcium. It’s a staple in Sri Lankan diets, often prepared as ‘mallung,’ a traditional dish mixed with coconut and spices.",
-        user: "Lanka Greens",
-        photo: "https://images.unsplash.com/photo-1605027990121-cbae9e0642df?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-        category: "Crops"
-    },
-    {
-        title: "Fresh Okra from Polonnaruwa",
-        content: "Harvested daily in Polonnaruwa, this okra is cultivated using drip irrigation, a technique that conserves water while ensuring consistent quality. Rich in fiber and antioxidants, it’s a versatile vegetable enjoyed in Sri Lankan curries and stir-fries.",
-        user: "Agro Lanka Co-op",
-        photo: "https://images.unsplash.com/photo-1605027990121-cbae9e0642df?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-        category: "Crops"
-    },
-    {
-        title: "Alert: Crop Diseases Affecting Tomatoes and Peppers",
-        content: "Sri Lankan farmers are tackling serious fungal and bacterial diseases, including Early Blight (caused by Alternaria solani) affecting tomatoes and Bacterial Wilt (caused by Ralstonia solanacearum) impacting peppers and other crops. Early detection and management are crucial to prevent significant losses.",
-        user: "AgriWatch Sri Lanka",
-        photo: "https://images.unsplash.com/photo-1605027990121-cbae9e0642df?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-        category: "Alerts"
-    },
-    {
-        title: "Record Mango Harvest in Southern Province",
-        content: "The Southern Province has celebrated a record-breaking mango harvest this season, driven by optimal weather and advanced farming techniques. This abundant yield is set to enhance local exports and uplift the livelihoods of farmers across the region.",
-        user: "Daily Agro News",
-        photo: "https://images.unsplash.com/photo-1605027990121-cbae9e0642df?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", // Suggested: Replace with an image of a mango harvest in Sri Lanka, e.g., farmers picking mangoes or crates of ripe fruit
-        category: "News"
+// Interface for current user data
+interface CurrentUser {
+    id: number;
+    name: string;
+    username: string;
+    profileImage: string | null;
+    city: string;
+}
+
+// Transform API data to match card component props
+interface CardDetails {
+    title: string;
+    content: string;
+    user: string;
+    photo: string;
+}
+
+// Facebook-style Add Story Card Component
+const AddStoryCard = ({ currentUser, onClick }: { currentUser: CurrentUser | null, onClick: () => void }) => {
+    const [imageError, setImageError] = useState(false);
+    
+    const getUserProfileImage = () => {
+        if (!currentUser?.profileImage || imageError) {
+            return null;
+        }
+        
+        if (currentUser.profileImage.startsWith('data:image')) {
+            return currentUser.profileImage;
+        }
+        
+        return `data:image/jpeg;base64,${currentUser.profileImage}`;
+    };
+
+    const profileImageSrc = getUserProfileImage();
+
+    if (!currentUser) {
+        return (
+            <Card sx={{
+                width: 250,
+                minWidth: 250,
+                margin: '8px',
+                height: 400, // Exact same as VegitableStoryCard
+                borderRadius: 1,
+                border: '1px solid #c8e6c9',
+            }}>
+                <Skeleton variant="rectangular" width="100%" height="240" />
+                <Box sx={{ p: 2 }}>
+                    <Skeleton width="80%" height={20} />
+                    <Skeleton width="60%" height={15} sx={{ mt: 0.5 }} />
+                </Box>
+            </Card>
+        );
     }
-];
+
+    return (
+        <Card
+            onClick={onClick}
+            sx={{
+                width: 250, // Exact same as VegitableStoryCard
+                minWidth: 250, // Exact same as VegitableStoryCard
+                margin: '8px', // Exact same as VegitableStoryCard
+                height: 400, // Exact same as VegitableStoryCard
+                boxShadow: 2, // Exact same as VegitableStoryCard
+                cursor: 'pointer',
+                borderRadius: 1,
+                overflow: 'hidden',
+                position: 'relative',
+                border: '1px solid #c8e6c9',
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                    transform: 'translateY(-4px)',
+                    boxShadow: '0 8px 16px rgba(46, 125, 50, 0.25)',
+                    borderColor: '#4caf50'
+                }
+            }}
+        >
+            {/* Background Image Section - same height as CardMedia in VegitableStoryCard */}
+            <Box sx={{
+                height: 240, // Exact same as CardMedia height in VegitableStoryCard
+                background: profileImageSrc 
+                    ? `linear-gradient(rgba(76, 175, 80, 0.3), rgba(76, 175, 80, 0.3)), url(${profileImageSrc})` 
+                    : 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+            }}>
+                {!profileImageSrc && (
+                    <PersonIcon sx={{ fontSize: 60, color: 'white', opacity: 0.8 }} />
+                )}
+                
+                {/* Add Button */}
+                <Box sx={{
+                    position: 'absolute',
+                    bottom: -25,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: 50,
+                    height: 50,
+                    borderRadius: '50%',
+                    backgroundColor: '#2e7d32',
+                    border: '4px solid white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 2px 8px rgba(76, 175, 80, 0.3)',
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                        transform: 'translateX(-50%) scale(1.1)',
+                        backgroundColor: '#1b5e20'
+                    }
+                }}>
+                    <AddIcon sx={{ color: 'white', fontSize: 28 }} />
+                </Box>
+            </Box>
+
+            {/* Content Section - same structure as CardContent in VegitableStoryCard */}
+            <CardContent sx={{
+                height: 'calc(400px - 240px)', // Remaining height after image section
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+                textAlign: 'center',
+                backgroundColor: 'rgba(240, 247, 235, 0.4)',
+                pt: 4 // Extra padding top to account for overlapping button
+            }}>
+                <Typography 
+                    gutterBottom 
+                    variant="h5" 
+                    component="div"
+                    sx={{
+                        color: '#2e7d32',
+                        fontWeight: 'bold',
+                        fontSize: '1.2rem'
+                    }}
+                >
+                    Add to story
+                </Typography>
+                <Typography 
+                    variant="body2" 
+                    sx={{ 
+                        color: '#558b2f',
+                        textAlign: 'center'
+                    }}
+                >
+                    Share your farming experience with the community
+                </Typography>
+                <Typography 
+                    variant="caption" 
+                    sx={{ 
+                        mt: 1,
+                        color: '#2e7d32',
+                        fontWeight: 'medium'
+                    }}
+                >
+                    Create by: {currentUser?.name || 'You'}
+                </Typography>
+            </CardContent>
+        </Card>
+    );
+};
+
 const postsData: VegitablePostProps[] = [
     {
         title: "Fresh Organic Vegetables Available",
@@ -117,6 +264,104 @@ const postsData: VegitablePostProps[] = [
 ];
 
 export default function Home() {
+    const [cardsDetails, setCardsDetails] = useState<CardDetails[]>([]);
+    const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+    const [loading, setLoading] = useState<boolean>(true);
+    const [userLoading, setUserLoading] = useState<boolean>(true);
+    const [error, setError] = useState<string | null>(null);
+
+    // Function to convert base64 string to proper data URL for image display
+    const convertImageToDataUrl = (imageData: string | null): string => {
+        const defaultImage = "https://fastly.picsum.photos/id/75/1999/2998.jpg?hmac=0agRZd8c5CRiFvADOWJqfTv6lqYBty3Kw-9LEtLp_98";
+        
+        if (!imageData) {
+            return defaultImage;
+        }
+        
+        if (imageData.startsWith('data:image')) {
+            return imageData;
+        }
+        
+        return `data:image/jpeg;base64,${imageData}`;
+    };
+
+    // Function to safely get user name from username object
+    const getUserName = (username: StoryData['username']): string => {
+        if (!username || !username.name) {
+            return "Unknown User";
+        }
+        return username.name;
+    };
+
+    // Function to fetch current user data (mock for now - replace with your API)
+    const fetchCurrentUser = async () => {
+        try {
+            setUserLoading(true);
+            // Mock current user data - replace with your actual API call
+            // const response = await fetch('http://localhost:8080/user/current');
+            
+            // For now, using mock data - replace this with actual API call
+            const mockUser: CurrentUser = {
+                id: 1,
+                name: "",
+                username: "create farmer",
+                profileImage: null, // Will use gradient background
+                city: "Colombo"
+            };
+            
+            setCurrentUser(mockUser);
+        } catch (err) {
+            console.error('Error fetching current user:', err);
+            setCurrentUser(null);
+        } finally {
+            setUserLoading(false);
+        }
+    };
+
+    // Function to handle add story click
+    const handleAddStoryClick = () => {
+        console.log("Add story clicked for user:", currentUser?.name);
+        alert(`Add Story for ${currentUser?.name}!`);
+        // TODO: Navigate to add story page or open modal
+    };
+
+    // Function to fetch story data from API
+    const fetchStoryData = async () => {
+        try {
+            setLoading(true);
+            const response = await fetch('http://localhost:8080/sharestory/all');
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data: StoryData[] = await response.json();
+            
+            const transformedData: CardDetails[] = data
+                .filter(story => story && story.title && story.discription)
+                .map((story) => ({
+                    title: story.title || "Untitled",
+                    content: story.discription || "No description available",
+                    user: getUserName(story.username),
+                    photo: convertImageToDataUrl(story.image)
+                }));
+            
+            setCardsDetails(transformedData);
+            setError(null);
+        } catch (err) {
+            console.error('Error fetching story data:', err);
+            setError(err instanceof Error ? err.message : 'Failed to fetch story data');
+            setCardsDetails([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchCurrentUser();
+        fetchStoryData();
+    }, []);
+
     return (
         <Box sx={{
             width: '100%',
@@ -125,11 +370,12 @@ export default function Home() {
             px: { xs: 0, sm: 1, md: 2 }
         }}>
             {/* Stories section */}
-            {/* Stories section */}
             <Box sx={{ mb: 4 }}>
                 <Typography variant="h6" sx={{ mb: 1, pl: { xs: 1, sm: 1, md: 0 } }}>
                     Latest Updates
                 </Typography>
+                
+                {/* Stories list with Add Story card first */}
                 <Box
                     sx={{
                         display: "flex",
@@ -155,7 +401,52 @@ export default function Home() {
                         },
                     }}
                 >
-                    {cardsDetails.map((card, index) => (
+                    {/* Add Story Card - Always first (Facebook style) */}
+                    <Box sx={{
+                        minWidth: { xs: '140px', sm: '180px', md: '200px' },
+                        flexShrink: 0
+                    }}>
+                        <AddStoryCard 
+                            currentUser={currentUser} 
+                            onClick={handleAddStoryClick} 
+                        />
+                    </Box>
+
+                    {/* Loading indicator for stories */}
+                    {loading && (
+                        <>
+                            {[1, 2, 3].map((index) => (
+                                <Box key={index} sx={{
+                                    minWidth: { xs: '140px', sm: '180px', md: '200px' },
+                                    flexShrink: 0
+                                }}>
+                                    <Skeleton 
+                                        variant="rectangular" 
+                                        height={{ xs: 200, sm: 220, md: 240 }}
+                                        sx={{ borderRadius: 2 }}
+                                    />
+                                </Box>
+                            ))}
+                        </>
+                    )}
+
+                    {/* Error message */}
+                    {error && !loading && (
+                        <Box sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            minWidth: '200px',
+                            p: 2
+                        }}>
+                            <Typography color="error" variant="body2">
+                                Error loading stories
+                            </Typography>
+                        </Box>
+                    )}
+
+                    {/* Existing Story Cards */}
+                    {!loading && cardsDetails.map((card, index) => (
                         <Box
                             key={index}
                             sx={{
@@ -172,30 +463,39 @@ export default function Home() {
                             />
                         </Box>
                     ))}
+
+                    {/* Show message if no stories available */}
+                    {!loading && cardsDetails.length === 0 && !error && (
+                        <Box sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            minWidth: '200px',
+                            p: 2
+                        }}>
+                            <Typography color="text.secondary" variant="body2">
+                                No stories yet. Be the first!
+                            </Typography>
+                        </Box>
+                    )}
                 </Box>
             </Box>
 
             {/* Posts section */}
             <Box sx={{
                 width: '100%',
-                maxWidth: '100%', // Use full width
+                maxWidth: '100%',
                 mx: 'auto',
                 px: { xs: 0, sm: 1, md: 2 },
                 backgroundColor: '#ffffff'
             }}>
-                {/* Stories section */}
-                <Box sx={{ mb: 4, backgroundColor: '#ffffff' }}>
-                    {/* Story content remains the same */}
-                </Box>
-
-                {/* Posts section */}
                 <Box sx={{
                     display: 'flex',
                     justifyContent: 'center',
                     backgroundColor: '#ffffff'
                 }}>
                     <Box sx={{
-                        width: { xs: '100%', sm: '80%', md: '60%', lg: '50%' }, // Responsive width
+                        width: { xs: '100%', sm: '80%', md: '60%', lg: '50%' },
                         minWidth: { xs: '100%', sm: '280px' },
                         px: { xs: 1, sm: 2 }
                     }}>
