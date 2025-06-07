@@ -25,8 +25,7 @@ public class Delivery {
     @Column(name = "location", length = 45)
     private String location;
 
-    @Column(name = "sharedpost_id")
-    private Integer sharedPostId;
+
 
     @Column(name = "current_package_location")
     private String currentPackageLocation;
@@ -37,11 +36,6 @@ public class Delivery {
     @Column(name = "description")
     private String description;
 
-    @Column(name = "delivery_staus_id")
-    private Integer deliveryStatusId;
-
-    @Column(name = "payment_id")
-    private Integer paymentId;
 
     @ManyToOne(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     @JoinColumn(name = "delivery_staus_id", referencedColumnName = "id")

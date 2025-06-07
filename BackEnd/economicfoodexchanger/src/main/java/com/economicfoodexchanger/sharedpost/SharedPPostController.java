@@ -1,6 +1,5 @@
 package com.economicfoodexchanger.sharedpost;
 
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -11,9 +10,10 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/sharedpost")
-public class SharedPostController {
 
-    @Autowired
+public class SharedPPostController {
+
+@Autowired
     SharedPostDao sharedPostDao;
 
     @GetMapping("/all")
@@ -38,4 +38,5 @@ public class SharedPostController {
         }
         return ResponseEntity.notFound().build();
     }
+
 }

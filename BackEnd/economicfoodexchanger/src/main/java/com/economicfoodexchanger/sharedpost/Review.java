@@ -1,5 +1,6 @@
 package com.economicfoodexchanger.sharedpost;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -23,6 +24,7 @@ public class Review {
     @Column(name = "rate", length = 45)
     private String rate;
 
+    @JsonIgnore
     @ManyToOne
     @JoinColumn(name = "sharedpost_id", referencedColumnName = "id")
     private SharedPost sharedPost;

@@ -52,7 +52,7 @@
         )
         private List<Role> roleList;
 
-/*        @OneToOne
+        @OneToOne
         @JoinColumn(name = "cummiunitymember_id", referencedColumnName = "id")
-        private CommunityMember communityMember;*/
+        private CommunityMember communityMember;
     }

@@ -1,5 +1,6 @@
 package com.economicfoodexchanger.sharedpost;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -17,12 +18,13 @@ public class Review {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @Column (name = "comment", length = 45)
+    @Column (name = "comment")
     private String comment;
 
-    @Column(name = "rate", length = 45)
+    @Column(name = "rate")
     private String rate;
 
+    @JsonIgnore
     @ManyToOne
     @JoinColumn(name = "sharedpost_id", referencedColumnName = "id")
     private SharedPost sharedPost;
