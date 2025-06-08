@@ -11,7 +11,7 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/sharedpost")
 
-public class SharedPPostController {
+public class SharedPostController {
 
 @Autowired
     SharedPostDao sharedPostDao;
@@ -38,5 +38,6 @@ public class SharedPPostController {
         }
         return ResponseEntity.notFound().build();
     }
+
 
 }
