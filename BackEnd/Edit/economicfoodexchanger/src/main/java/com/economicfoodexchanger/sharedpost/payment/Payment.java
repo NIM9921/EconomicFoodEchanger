@@ -17,11 +17,25 @@ public class Payment {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     Integer id;
-    BigDecimal amount;
-    String note ;
+
+    @Column(name = "amount")
+    private  BigDecimal amount;
+
+    @Column(name = "note")
+    private  String note ;
+
+    @Column(name = "file")
+    private byte[]  file;
+
+    @Column(name = "status")
+    private boolean status;
+
+    @Column(name = "filetype")
+    private String filetype;
 
     @ManyToOne
     @JoinColumn(name = "payment_type_id", referencedColumnName = "id")
-    Payment payment_type_id;
-    boolean status;
+    PaymentType paymentType;
+
+
 }

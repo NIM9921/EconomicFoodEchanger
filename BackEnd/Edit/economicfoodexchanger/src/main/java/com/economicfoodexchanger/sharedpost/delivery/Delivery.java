@@ -25,6 +25,15 @@ public class Delivery {
     @Column(name = "location", length = 45)
     private String location;
 
+    @Column(name = "current_package_location")
+    private String currentPackageLocation;
+
+    @Column(name = "delivery_company")
+    private String deliveryCompany;
+
+    @Column(name = "description")
+    private String description;
+
     @ManyToOne(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     @JoinColumn(name = "delivery_staus_id", referencedColumnName = "id")
     private DeliveryStaus deliveryStatus;

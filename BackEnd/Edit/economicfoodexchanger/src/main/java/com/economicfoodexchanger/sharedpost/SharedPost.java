@@ -2,6 +2,7 @@ package com.economicfoodexchanger.sharedpost;
 
 import com.economicfoodexchanger.User;
 import com.economicfoodexchanger.sharedpost.delivery.Delivery;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -38,10 +39,12 @@ public class SharedPost {
     @JoinColumn(name = "user_id",referencedColumnName = "id")
     private User username;
 
-    @OneToMany(mappedBy = "sharedpost")
+
+    @OneToMany(mappedBy = "sharedpost",fetch = FetchType.EAGER)
     private List<BitDetails> bitDetails;
 
-    @OneToMany(mappedBy = "sharedPost")
+
+    @OneToMany(mappedBy = "sharedPost", fetch = FetchType.EAGER)
     private List<Review> reviews;
 
 }

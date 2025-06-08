@@ -4,6 +4,8 @@ import VegitablePost, { VegitablePostProps } from "./VegitablePost";
 import { Box, Typography, CircularProgress, Card, CardContent, Skeleton } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import PersonIcon from '@mui/icons-material/Person';
+// Add this import at the top of your main component file
+import SharePostForm from './sharestory/SharePostForm.tsx';
 
 // Interface for the API response data
 interface StoryData {
@@ -269,6 +271,8 @@ export default function Home() {
     const [loading, setLoading] = useState<boolean>(true);
     const [userLoading, setUserLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
+    // Add this state variable with your other useState declarations
+    const [shareDialogOpen, setShareDialogOpen] = useState(false);
 
     // Function to convert base64 string to proper data URL for image display
     const convertImageToDataUrl = (imageData: string | null): string => {
@@ -318,11 +322,16 @@ export default function Home() {
         }
     };
 
-    // Function to handle add story click
+    // Update your handleAddStoryClick function
     const handleAddStoryClick = () => {
         console.log("Add story clicked for user:", currentUser?.name);
-        alert(`Add Story for ${currentUser?.name}!`);
-        // TODO: Navigate to add story page or open modal
+        setShareDialogOpen(true);
+    };
+
+    // Add this function to handle successful story upload
+    const handleStoryUploadSuccess = () => {
+        // Refresh the stories list
+        fetchStoryData();
     };
 
     // Function to fetch story data from API
@@ -507,6 +516,13 @@ export default function Home() {
                     </Box>
                 </Box>
             </Box>
+            {/* Add the SharePostForm component before the closing Box tag in your JSX */}
+            <SharePostForm
+                open={shareDialogOpen}
+                onClose={() => setShareDialogOpen(false)}
+                currentUser={currentUser}
+                onSuccess={handleStoryUploadSuccess}
+            />
         </Box>
     );
 }

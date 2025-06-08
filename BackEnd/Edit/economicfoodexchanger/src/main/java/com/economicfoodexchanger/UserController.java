@@ -37,4 +37,15 @@ public class UserController {
         Optional<User> user = Optional.of(userDao.findUserByUsername(username));
         return user.get();
     }
+
+    @PostMapping()
+    public User save(@RequestBody User user) {
+        try {
+            return userDao.save(user);
+        } catch (Exception e) {
+            System.out.println("Error saving user: " + e.getMessage());
+            return null;
+        }
+    }
+
 }
