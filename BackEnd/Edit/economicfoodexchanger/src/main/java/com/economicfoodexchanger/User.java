@@ -1,5 +1,6 @@
     package com.economicfoodexchanger;
 
+    import jakarta.annotation.Nullable;
     import jakarta.persistence.*;
     import lombok.AllArgsConstructor;
     import lombok.Data;
@@ -44,7 +45,7 @@
         @Column(name = "password", nullable = false, length = 45)
         private String password;
 
-        @ManyToMany(fetch =FetchType.EAGER, cascade = CascadeType.ALL)
+        @ManyToMany(fetch =FetchType.EAGER, cascade = CascadeType.MERGE)
         @JoinTable(
                 name = "user_has_role",
                 joinColumns = @JoinColumn(name = "user_id"),
@@ -52,7 +53,7 @@
         )
         private List<Role> roleList;
 
-/*        @OneToOne
-        @JoinColumn(name = "cummiunitymember_id", referencedColumnName = "id")
-        private CommunityMember communityMember;*/
+        @OneToOne
+        @JoinColumn(name = "cummiunitymember_id", referencedColumnName = "id",columnDefinition = "INT DEFAULT 1")
+        private CommunityMember communityMember;
     }

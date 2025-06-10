@@ -1,5 +1,6 @@
 package com.economicfoodexchanger.sharedpost;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
@@ -26,12 +27,13 @@ public class BitDetails {
     @Column(name = "needamount", precision = 10, scale = 2)
     private BigDecimal needamount;
 
-    @Column(name = "bitdetailscol", precision = 10, scale = 2)
-    private BigDecimal bitdetailscol;
+    @Column(name = "bitdetailscol", length = 255)
+    private String bitdetailscol;
 
-    @Column(name = "conformedstate", length = 45)
-    private String conformedstate;
+    @Column(name = "conformedstate")
+    private boolean conformedstate;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "sharedpost_id", referencedColumnName = "id")
     private SharedPost sharedpost;

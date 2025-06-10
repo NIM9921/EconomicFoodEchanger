@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import VegitableStoryCard from "./CardComponent";
-import VegitablePost, { VegitablePostProps } from "./VegitablePost";
-import { Box, Typography, CircularProgress, Card, CardContent, Skeleton } from '@mui/material';
+import VegitablePost, { SharedPostData } from "./VegitablePost";
+import { Box, Typography, Skeleton, Tabs, Tab, Alert, Button, Chip } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import PersonIcon from '@mui/icons-material/Person';
+import ShareStoryForm from './sharestory/ShareStoryForm.tsx';
+import ApiConfig from '../utils/ApiConfig';
 
 // Interface for the API response data
 interface StoryData {
@@ -49,16 +51,16 @@ interface CardDetails {
 // Facebook-style Add Story Card Component
 const AddStoryCard = ({ currentUser, onClick }: { currentUser: CurrentUser | null, onClick: () => void }) => {
     const [imageError, setImageError] = useState(false);
-    
+
     const getUserProfileImage = () => {
         if (!currentUser?.profileImage || imageError) {
             return null;
         }
-        
+
         if (currentUser.profileImage.startsWith('data:image')) {
             return currentUser.profileImage;
         }
-        
+
         return `data:image/jpeg;base64,${currentUser.profileImage}`;
     };
 
@@ -66,11 +68,11 @@ const AddStoryCard = ({ currentUser, onClick }: { currentUser: CurrentUser | nul
 
     if (!currentUser) {
         return (
-            <Card sx={{
+            <Box sx={{
                 width: 250,
                 minWidth: 250,
                 margin: '8px',
-                height: 400, // Exact same as VegitableStoryCard
+                height: 400,
                 borderRadius: 1,
                 border: '1px solid #c8e6c9',
             }}>
@@ -79,19 +81,19 @@ const AddStoryCard = ({ currentUser, onClick }: { currentUser: CurrentUser | nul
                     <Skeleton width="80%" height={20} />
                     <Skeleton width="60%" height={15} sx={{ mt: 0.5 }} />
                 </Box>
-            </Card>
+            </Box>
         );
     }
 
     return (
-        <Card
+        <Box
             onClick={onClick}
             sx={{
-                width: 250, // Exact same as VegitableStoryCard
-                minWidth: 250, // Exact same as VegitableStoryCard
-                margin: '8px', // Exact same as VegitableStoryCard
-                height: 400, // Exact same as VegitableStoryCard
-                boxShadow: 2, // Exact same as VegitableStoryCard
+                width: 250,
+                minWidth: 250,
+                margin: '8px',
+                height: 400,
+                boxShadow: 2,
                 cursor: 'pointer',
                 borderRadius: 1,
                 overflow: 'hidden',
@@ -105,11 +107,11 @@ const AddStoryCard = ({ currentUser, onClick }: { currentUser: CurrentUser | nul
                 }
             }}
         >
-            {/* Background Image Section - same height as CardMedia in VegitableStoryCard */}
+            {/* Background Image Section */}
             <Box sx={{
-                height: 240, // Exact same as CardMedia height in VegitableStoryCard
-                background: profileImageSrc 
-                    ? `linear-gradient(rgba(76, 175, 80, 0.3), rgba(76, 175, 80, 0.3)), url(${profileImageSrc})` 
+                height: 240,
+                background: profileImageSrc
+                    ? `linear-gradient(rgba(76, 175, 80, 0.3), rgba(76, 175, 80, 0.3)), url(${profileImageSrc})`
                     : 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)',
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
@@ -121,7 +123,7 @@ const AddStoryCard = ({ currentUser, onClick }: { currentUser: CurrentUser | nul
                 {!profileImageSrc && (
                     <PersonIcon sx={{ fontSize: 60, color: 'white', opacity: 0.8 }} />
                 )}
-                
+
                 {/* Add Button */}
                 <Box sx={{
                     position: 'absolute',
@@ -147,20 +149,21 @@ const AddStoryCard = ({ currentUser, onClick }: { currentUser: CurrentUser | nul
                 </Box>
             </Box>
 
-            {/* Content Section - same structure as CardContent in VegitableStoryCard */}
-            <CardContent sx={{
-                height: 'calc(400px - 240px)', // Remaining height after image section
+            {/* Content Section */}
+            <Box sx={{
+                height: 'calc(400px - 240px)',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'center',
                 alignItems: 'center',
                 textAlign: 'center',
                 backgroundColor: 'rgba(240, 247, 235, 0.4)',
-                pt: 4 // Extra padding top to account for overlapping button
+                pt: 4,
+                px: 2
             }}>
-                <Typography 
-                    gutterBottom 
-                    variant="h5" 
+                <Typography
+                    gutterBottom
+                    variant="h5"
                     component="div"
                     sx={{
                         color: '#2e7d32',
@@ -170,18 +173,18 @@ const AddStoryCard = ({ currentUser, onClick }: { currentUser: CurrentUser | nul
                 >
                     Add to story
                 </Typography>
-                <Typography 
-                    variant="body2" 
-                    sx={{ 
+                <Typography
+                    variant="body2"
+                    sx={{
                         color: '#558b2f',
                         textAlign: 'center'
                     }}
                 >
                     Share your farming experience with the community
                 </Typography>
-                <Typography 
-                    variant="caption" 
-                    sx={{ 
+                <Typography
+                    variant="caption"
+                    sx={{
                         mt: 1,
                         color: '#2e7d32',
                         fontWeight: 'medium'
@@ -189,79 +192,10 @@ const AddStoryCard = ({ currentUser, onClick }: { currentUser: CurrentUser | nul
                 >
                     Create by: {currentUser?.name || 'You'}
                 </Typography>
-            </CardContent>
-        </Card>
+            </Box>
+        </Box>
     );
 };
-
-const postsData: VegitablePostProps[] = [
-    {
-        title: "Fresh Organic Vegetables Available",
-        user: "Farmer John",
-        userAvatar: "https://randomuser.me/api/portraits/men/32.jpg",
-        timestamp: "Today at 10:23 AM",
-        content: "Fresh organic vegetables from my farm. Harvested this morning and ready for delivery. Looking for buyers interested in premium quality produce.",
-        tags: ["Organic", "LocalProduce", "FarmToTable"],
-        category: "selling",
-        images: [
-            {
-                img: "https://images.unsplash.com/photo-1592924357228-91a4daadcfea",
-                title: "Tomatoes",
-                featured: true
-            },
-            {
-                img: "https://images.unsplash.com/photo-1576045057995-568f588f82fb",
-                title: "Leafy Greens"
-            },
-            {
-                img: "https://images.unsplash.com/photo-1598170845058-32b9d6a5da37",
-                title: "Root Vegetables"
-            }
-        ],
-        likes: 24,
-        comments: 5
-    },
-    {
-        title: "Looking for Fresh Spinach Bulk Supply",
-        user: "Green Grocers",
-        userAvatar: "https://randomuser.me/api/portraits/women/44.jpg",
-        timestamp: "Yesterday at 3:15 PM",
-        content: "Our restaurant needs a regular supply of fresh spinach. Looking for local farmers who can provide 50kg per week. Organic preferred. Please contact with pricing details.",
-        tags: ["SpinachNeeded", "BulkBuying", "RestaurantSupply"],
-        category: "buying",
-        images: [
-            {
-                img: "https://images.unsplash.com/photo-1576045057995-568f588f82fb",
-                title: "Spinach",
-                featured: true
-            }
-        ],
-        likes: 12,
-        comments: 8
-    },
-    {
-        title: "Premium Rice Harvest Ready for Sale",
-        user: "Rice Fields Co-op",
-        userAvatar: "https://randomuser.me/api/portraits/men/22.jpg",
-        timestamp: "2 days ago",
-        content: "This season's rice harvest is ready. Premium quality, pesticide-free. Available in bulk quantities. Special price for regular buyers.",
-        tags: ["RiceHarvest", "PremiumQuality", "BulkSale"],
-        category: "selling",
-        images: [
-            {
-                img: "https://images.unsplash.com/photo-1536304993881-ff6e9eefa2a6",
-                title: "Rice Fields",
-                featured: true
-            },
-            {
-                img: "https://images.unsplash.com/photo-1595436252086-7496fb8c53d9",
-                title: "Rice Grains"
-            }
-        ],
-        likes: 38,
-        comments: 7
-    }
-];
 
 export default function Home() {
     const [cardsDetails, setCardsDetails] = useState<CardDetails[]>([]);
@@ -269,19 +203,26 @@ export default function Home() {
     const [loading, setLoading] = useState<boolean>(true);
     const [userLoading, setUserLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
+    const [shareDialogOpen, setShareDialogOpen] = useState(false);
+    const [selectedTab, setSelectedTab] = useState(0); // Start with Community Posts tab
+
+    // State for shared posts
+    const [sharedPosts, setSharedPosts] = useState<SharedPostData[]>([]);
+    const [postsLoading, setPostsLoading] = useState<boolean>(false);
+    const [postsError, setPostsError] = useState<string | null>(null);
 
     // Function to convert base64 string to proper data URL for image display
     const convertImageToDataUrl = (imageData: string | null): string => {
         const defaultImage = "https://fastly.picsum.photos/id/75/1999/2998.jpg?hmac=0agRZd8c5CRiFvADOWJqfTv6lqYBty3Kw-9LEtLp_98";
-        
+
         if (!imageData) {
             return defaultImage;
         }
-        
+
         if (imageData.startsWith('data:image')) {
             return imageData;
         }
-        
+
         return `data:image/jpeg;base64,${imageData}`;
     };
 
@@ -293,22 +234,18 @@ export default function Home() {
         return username.name;
     };
 
-    // Function to fetch current user data (mock for now - replace with your API)
+    // Function to fetch current user data
     const fetchCurrentUser = async () => {
         try {
             setUserLoading(true);
-            // Mock current user data - replace with your actual API call
-            // const response = await fetch('http://localhost:8080/user/current');
-            
-            // For now, using mock data - replace this with actual API call
             const mockUser: CurrentUser = {
                 id: 1,
                 name: "",
                 username: "create farmer",
-                profileImage: null, // Will use gradient background
+                profileImage: null,
                 city: "Colombo"
             };
-            
+
             setCurrentUser(mockUser);
         } catch (err) {
             console.error('Error fetching current user:', err);
@@ -318,25 +255,61 @@ export default function Home() {
         }
     };
 
-    // Function to handle add story click
+    // Function to fetch shared posts from API
+    const fetchSharedPosts = async () => {
+        try {
+            setPostsLoading(true);
+            setPostsError(null);
+            console.log('Fetching shared posts...');
+
+            const response = await fetch(ApiConfig.Domain + '/sharedpost/all');
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data: SharedPostData[] = await response.json();
+            console.log('Fetched shared posts data:', data);
+
+            setSharedPosts(data || []);
+        } catch (err) {
+            console.error('Error fetching shared posts:', err);
+            setPostsError(err instanceof Error ? err.message : 'Failed to fetch shared posts');
+            setSharedPosts([]);
+        } finally {
+            setPostsLoading(false);
+        }
+    };
+
     const handleAddStoryClick = () => {
         console.log("Add story clicked for user:", currentUser?.name);
-        alert(`Add Story for ${currentUser?.name}!`);
-        // TODO: Navigate to add story page or open modal
+        setShareDialogOpen(true);
+    };
+
+    const handleStoryUploadSuccess = () => {
+        fetchStoryData();
+    };
+
+    const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+        setSelectedTab(newValue);
+        // Fetch shared posts when switching to community posts tab
+        if (newValue === 0 && sharedPosts.length === 0) {
+            fetchSharedPosts();
+        }
     };
 
     // Function to fetch story data from API
     const fetchStoryData = async () => {
         try {
             setLoading(true);
-            const response = await fetch('http://localhost:8080/sharestory/all');
-            
+            const response = await fetch(ApiConfig.Domain + '/sharestory/all');
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             const data: StoryData[] = await response.json();
-            
+
             const transformedData: CardDetails[] = data
                 .filter(story => story && story.title && story.discription)
                 .map((story) => ({
@@ -345,7 +318,7 @@ export default function Home() {
                     user: getUserName(story.username),
                     photo: convertImageToDataUrl(story.image)
                 }));
-            
+
             setCardsDetails(transformedData);
             setError(null);
         } catch (err) {
@@ -360,69 +333,89 @@ export default function Home() {
     useEffect(() => {
         fetchCurrentUser();
         fetchStoryData();
+        // Load community posts by default
+        fetchSharedPosts();
     }, []);
+
+    // Loading skeleton for posts
+    const PostSkeleton = () => (
+        <Box sx={{ mb: 3 }}>
+            <Skeleton variant="rectangular" width="100%" height={60} sx={{ borderRadius: 2, mb: 1 }} />
+            <Skeleton variant="rectangular" width="100%" height={120} sx={{ borderRadius: 2, mb: 1 }} />
+            <Skeleton variant="rectangular" width="100%" height={200} sx={{ borderRadius: 2 }} />
+        </Box>
+    );
 
     return (
         <Box sx={{
             width: '100%',
-            maxWidth: { xs: '100%', sm: '100%', md: '800px', lg: '1300px' },
+            maxWidth: '100%',
             mx: 'auto',
-            px: { xs: 0, sm: 1, md: 2 }
+            backgroundColor: '#f8f9fa'
         }}>
             {/* Stories section */}
-            <Box sx={{ mb: 4 }}>
-                <Typography variant="h6" sx={{ mb: 1, pl: { xs: 1, sm: 1, md: 0 } }}>
-                    Latest Updates
+            <Box sx={{ 
+                mb: 4,
+                backgroundColor: 'white',
+                borderRadius: { xs: 0, sm: 2 },
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                p: { xs: 2, sm: 3 }
+            }}>
+                <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: 'text.primary' }}>
+                    🌟 Latest Stories & Updates
                 </Typography>
-                
+
                 {/* Stories list with Add Story card first */}
                 <Box
                     sx={{
                         display: "flex",
                         flexDirection: "row",
-                        gap: { xs: "8px", sm: "12px", md: "16px" },
+                        gap: { xs: "12px", sm: "16px" },
                         width: "100%",
                         maxWidth: "100%",
                         overflowX: "auto",
-                        padding: { xs: "12px 8px", sm: "16px 8px" },
                         pb: 2,
                         WebkitOverflowScrolling: "touch",
                         scrollbarWidth: "thin",
                         msOverflowStyle: "none",
                         "&::-webkit-scrollbar": {
-                            height: "6px",
+                            height: "8px",
                         },
                         "&::-webkit-scrollbar-track": {
                             background: "rgba(0, 0, 0, 0.05)",
+                            borderRadius: "4px",
                         },
                         "&::-webkit-scrollbar-thumb": {
                             backgroundColor: "#bdbdbd",
                             borderRadius: "4px",
+                            '&:hover': {
+                                backgroundColor: "#999"
+                            }
                         },
                     }}
                 >
-                    {/* Add Story Card - Always first (Facebook style) */}
+                    {/* Add Story Card */}
                     <Box sx={{
-                        minWidth: { xs: '140px', sm: '180px', md: '200px' },
+                        minWidth: { xs: '160px', sm: '200px', md: '220px' },
                         flexShrink: 0
                     }}>
-                        <AddStoryCard 
-                            currentUser={currentUser} 
-                            onClick={handleAddStoryClick} 
+                        <AddStoryCard
+                            currentUser={currentUser}
+                            onClick={handleAddStoryClick}
                         />
                     </Box>
 
                     {/* Loading indicator for stories */}
                     {loading && (
                         <>
-                            {[1, 2, 3].map((index) => (
+                            {[1, 2, 3, 4].map((index) => (
                                 <Box key={index} sx={{
-                                    minWidth: { xs: '140px', sm: '180px', md: '200px' },
+                                    minWidth: { xs: '160px', sm: '200px', md: '220px' },
                                     flexShrink: 0
                                 }}>
-                                    <Skeleton 
-                                        variant="rectangular" 
-                                        height={{ xs: 200, sm: 220, md: 240 }}
+                                    <Skeleton
+                                        variant="rectangular"
+                                        height={{ xs: 240, sm: 280, md: 320 }}
                                         sx={{ borderRadius: 2 }}
                                     />
                                 </Box>
@@ -432,9 +425,9 @@ export default function Home() {
 
                     {/* Error message */}
                     {error && !loading && (
-                        <Box sx={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
+                        <Box sx={{
+                            display: 'flex',
+                            alignItems: 'center',
                             justifyContent: 'center',
                             minWidth: '200px',
                             p: 2
@@ -450,8 +443,7 @@ export default function Home() {
                         <Box
                             key={index}
                             sx={{
-                                minWidth: { xs: '140px', sm: '180px', md: '200px' },
-                                height: { xs: 'auto', sm: 'auto' },
+                                minWidth: { xs: '160px', sm: '200px', md: '220px' },
                                 flexShrink: 0
                             }}
                         >
@@ -466,47 +458,164 @@ export default function Home() {
 
                     {/* Show message if no stories available */}
                     {!loading && cardsDetails.length === 0 && !error && (
-                        <Box sx={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
+                        <Box sx={{
+                            display: 'flex',
+                            alignItems: 'center',
                             justifyContent: 'center',
-                            minWidth: '200px',
-                            p: 2
+                            minWidth: '300px',
+                            p: 3,
+                            textAlign: 'center'
                         }}>
-                            <Typography color="text.secondary" variant="body2">
-                                No stories yet. Be the first!
-                            </Typography>
+                            <Box>
+                                <Typography color="text.secondary" variant="h6" gutterBottom>
+                                    📚 No stories yet
+                                </Typography>
+                                <Typography color="text.secondary" variant="body2">
+                                    Be the first to share your farming story with the community!
+                                </Typography>
+                            </Box>
                         </Box>
                     )}
                 </Box>
             </Box>
 
-            {/* Posts section */}
+            {/* Posts section with improved layout */}
             <Box sx={{
                 width: '100%',
                 maxWidth: '100%',
-                mx: 'auto',
-                px: { xs: 0, sm: 1, md: 2 },
-                backgroundColor: '#ffffff'
+                mx: 'auto'
             }}>
-                <Box sx={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    backgroundColor: '#ffffff'
+                {/* Tabs for different post types */}
+                <Box sx={{ 
+                    backgroundColor: 'white',
+                    borderRadius: { xs: 0, sm: 2 },
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                    mb: 2
                 }}>
+                    <Tabs
+                        value={selectedTab}
+                        onChange={handleTabChange}
+                        aria-label="post tabs"
+                        variant="fullWidth"
+                        sx={{
+                            '& .MuiTab-root': {
+                                textTransform: 'none',
+                                fontWeight: 'bold',
+                                fontSize: '1rem',
+                                py: 2
+                            },
+                            '& .MuiTabs-indicator': {
+                                height: 3,
+                                borderRadius: '3px 3px 0 0'
+                            }
+                        }}
+                    >
+                        <Tab 
+                            label={
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Typography>🌍 Community Posts</Typography>
+                                    {sharedPosts.length > 0 && (
+                                        <Chip 
+                                            label={sharedPosts.length} 
+                                            size="small" 
+                                            color="primary"
+                                            sx={{ ml: 1 }}
+                                        />
+                                    )}
+                                </Box>
+                            }
+                        />
+                    </Tabs>
+                </Box>
+
+                {/* Community Posts Tab Panel */}
+                {selectedTab === 0 && (
                     <Box sx={{
-                        width: { xs: '100%', sm: '80%', md: '60%', lg: '50%' },
-                        minWidth: { xs: '100%', sm: '280px' },
-                        px: { xs: 1, sm: 2 }
+                        display: 'flex',
+                        justifyContent: 'center'
                     }}>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            {postsData.map((post, index) => (
-                                <VegitablePost key={index} {...post} />
-                            ))}
+                        <Box sx={{
+                            width: '100%',
+                            maxWidth: { xs: '100%', sm: '100%', md: '800px', lg: '900px' },
+                            px: { xs: 1, sm: 2 }
+                        }}>
+                            {postsLoading && (
+                                <Box>
+                                    {[1, 2, 3].map((index) => (
+                                        <PostSkeleton key={index} />
+                                    ))}
+                                </Box>
+                            )}
+
+                            {postsError && (
+                                <Alert 
+                                    severity="error" 
+                                    sx={{ 
+                                        mb: 2,
+                                        borderRadius: 2,
+                                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                                    }}
+                                    action={
+                                        <Button
+                                            color="inherit"
+                                            size="small"
+                                            onClick={fetchSharedPosts}
+                                        >
+                                            Retry
+                                        </Button>
+                                    }
+                                >
+                                    Error loading community posts: {postsError}
+                                </Alert>
+                            )}
+
+                            {!postsLoading && !postsError && sharedPosts.length === 0 && (
+                                <Box sx={{ 
+                                    textAlign: 'center', 
+                                    py: 8,
+                                    backgroundColor: 'white',
+                                    borderRadius: 2,
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                                }}>
+                                    <Typography variant="h4" sx={{ mb: 2 }}>
+                                        🌱
+                                    </Typography>
+                                    <Typography variant="h6" color="text.secondary" gutterBottom>
+                                        No community posts yet
+                                    </Typography>
+                                    <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                                        Be the first to share your farming experience with the community!
+                                    </Typography>
+                                    <Button 
+                                        variant="contained" 
+                                        color="primary"
+                                        onClick={() => setShareDialogOpen(true)}
+                                        sx={{ borderRadius: 2, px: 4, py: 1.5 }}
+                                    >
+                                        Share Your Story
+                                    </Button>
+                                </Box>
+                            )}
+
+                            {!postsLoading && sharedPosts.length > 0 && (
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                    {sharedPosts.map((post) => (
+                                        <VegitablePost key={post.id} post={post} />
+                                    ))}
+                                </Box>
+                            )}
                         </Box>
                     </Box>
-                </Box>
+                )}
             </Box>
+
+            {/* ShareStoryForm component */}
+            <ShareStoryForm
+                open={shareDialogOpen}
+                onClose={() => setShareDialogOpen(false)}
+                currentUser={currentUser}
+                onSuccess={handleStoryUploadSuccess}
+            />
         </Box>
     );
 }

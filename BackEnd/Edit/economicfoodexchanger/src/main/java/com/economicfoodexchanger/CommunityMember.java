@@ -34,7 +34,7 @@ public class CommunityMember {
      @Column(name = "address")
      private String address;
 
-     @Column(name = "shopOrFarmName")
+     @Column(name = "shoporfarmname")
      private String shopOrFarmName;
 
      @Column(name = "nic")

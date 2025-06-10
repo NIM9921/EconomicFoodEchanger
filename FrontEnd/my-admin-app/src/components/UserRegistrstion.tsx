@@ -1,4 +1,4 @@
-// UserRegistration.tsx with TypeScript fixes and scrolling fixes
+// UserRegistration.tsx with community member checkbox functionality
 import { useState } from 'react';
 import {
     Box,
@@ -17,6 +17,9 @@ import {
     Divider,
     useTheme,
     useMediaQuery,
+    FormControlLabel,
+    Checkbox,
+    Chip,
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import PersonIcon from '@mui/icons-material/Person';
@@ -30,6 +33,7 @@ import StoreIcon from '@mui/icons-material/Store';
 import BadgeIcon from '@mui/icons-material/Badge';
 import PhoneIcon from '@mui/icons-material/Phone';
 import DescriptionIcon from '@mui/icons-material/Description';
+import GroupIcon from '@mui/icons-material/Group';
 import { useNavigate } from 'react-router-dom';
 
 const PageWrapper = styled('div')({
@@ -62,18 +66,27 @@ const LeafBackground = styled(Box)({
 });
 
 export default function UserRegistration() {
-    const [firstName, setFirstName] = useState('');
-    const [lastName, setLastName] = useState('');
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-    const [userRole, setUserRole] = useState('farmer');
-    // Fields
+    // Basic user fields
+    const [name, setName] = useState('');
     const [city, setCity] = useState('');
     const [address, setAddress] = useState('');
-    const [shopOrFarmName, setShopOrFarmName] = useState('');
     const [nic, setNic] = useState('');
     const [mobileNumber, setMobileNumber] = useState('');
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+
+    // Community member checkbox and fields
+    const [isCommunityMember, setIsCommunityMember] = useState(false);
+    const [communityFirstName, setCommunityFirstName] = useState('');
+    const [communityLastName, setCommunityLastName] = useState('');
+    const [communityEmail, setCommunityEmail] = useState('');
+    const [communityCity, setCommunityCity] = useState('');
+    const [communityAddress, setCommunityAddress] = useState('');
+    const [shopOrFarmName, setShopOrFarmName] = useState('');
+    const [communityNic, setCommunityNic] = useState('');
+    const [communityMobileNumber, setCommunityMobileNumber] = useState('');
     const [description, setDescription] = useState('');
 
     const [error, setError] = useState('');
@@ -83,23 +96,34 @@ export default function UserRegistration() {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
+    const availableRoles = [
+        { id: 1, name: 'buyer' },
+        { id: 2, name: 'seller' },
+        { id: 3, name: 'farmer' },
+        { id: 4, name: 'admin' }
+    ];
+
+    const handleRoleChange = (event: any) => {
+        const value = event.target.value;
+        setSelectedRoles(typeof value === 'string' ? value.split(',') : value);
+    };
+
     const validateForm = () => {
         setError('');
 
-        if (!firstName || !lastName || !email || !password || !confirmPassword ||
-            !city || !address || !mobileNumber || !nic) {
-            setError('Please fill in all required fields');
+        // Basic validation
+        if (!name || !city || !address || !nic || !mobileNumber || !username || !password || !confirmPassword) {
+            setError('Please fill in all required basic fields');
             return false;
         }
 
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-            setError('Please enter a valid email address');
+        if (selectedRoles.length === 0) {
+            setError('Please select at least one role');
             return false;
         }
 
-        if (password.length < 6) {
-            setError('Password must be at least 6 characters long');
+        if (password.length < 4) {
+            setError('Password must be at least 4 characters long');
             return false;
         }
 
@@ -109,10 +133,30 @@ export default function UserRegistration() {
         }
 
         // Phone validation
-        const phoneRegex = /^\d{10}$/;
+        const phoneRegex = /^\d{9,10}$/;
         if (!phoneRegex.test(mobileNumber)) {
-            setError('Please enter a valid 10-digit mobile number');
+            setError('Please enter a valid mobile number (9-10 digits)');
             return false;
+        }
+
+        // Community member validation if checkbox is checked
+        if (isCommunityMember) {
+            if (!communityFirstName || !communityLastName || !communityEmail || 
+                !communityCity || !communityAddress || !communityNic || !communityMobileNumber) {
+                setError('Please fill in all required community member fields');
+                return false;
+            }
+
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(communityEmail)) {
+                setError('Please enter a valid email address for community member');
+                return false;
+            }
+
+            if (!phoneRegex.test(communityMobileNumber)) {
+                setError('Please enter a valid mobile number for community member');
+                return false;
+            }
         }
 
         return true;
@@ -128,34 +172,63 @@ export default function UserRegistration() {
         setIsSubmitting(true);
 
         try {
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            // Store user in localStorage (in production, you'd use a backend API)
-            localStorage.setItem(`user_${email}`, JSON.stringify({
-                firstName,
-                lastName,
-                email,
-                userRole,
+            // Prepare data in the format matching your JSON structure
+            const userData = {
+                name,
                 city,
                 address,
-                shopOrFarmName,
+                status: false, // Default status
                 nic,
-                mobileNumber,
-                description
-            }));
+                mobileNumber: parseInt(mobileNumber),
+                username,
+                password,
+                roleList: selectedRoles.map(roleName => {
+                    const role = availableRoles.find(r => r.name === roleName);
+                    return { id: role?.id || 0, name: roleName };
+                }),
+                // Only include communityMember if checkbox is checked
+                ...(isCommunityMember && {
+                    communityMember: {
+                        firstName: communityFirstName,
+                        lastName: communityLastName,
+                        email: communityEmail,
+                        city: communityCity,
+                        address: communityAddress,
+                        shopOrFarmName,
+                        nic: communityNic,
+                        mobileNumber: communityMobileNumber,
+                        description
+                    }
+                })
+            };
+
+            // Make actual API call to your server
+            const response = await fetch(ApiConfig.Domain+'/user', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(userData)
+            });
+
+            if (!response.ok) {
+                throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            console.log('Registration successful:', data);
 
             setSuccess('Registration successful! You can now log in.');
             setTimeout(() => {
                 navigate('/login');
             }, 2000);
-        } catch (_err) {
-            setError('Registration failed. Please try again.');
+        } catch (err) {
+            setError(`Registration failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+            console.error('Registration error:', err);
         } finally {
             setIsSubmitting(false);
         }
     };
-
     const inputStyle = {
         '& .MuiOutlinedInput-root': {
             '&.Mui-focused fieldset': {
@@ -226,66 +299,70 @@ export default function UserRegistration() {
                         )}
 
                         <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%' }}>
-                            <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
-                                Personal Information
+                            <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 2 }}>
+                                Basic Information
                             </Typography>
-
-                            <Box sx={{ display: 'flex', gap: 2, mb: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
-                                <TextField
-                                    fullWidth
-                                    required
-                                    label="First Name"
-                                    variant="outlined"
-                                    value={firstName}
-                                    onChange={(e) => setFirstName(e.target.value)}
-                                    InputProps={{
-                                        startAdornment: (
-                                            <InputAdornment position="start">
-                                                <PersonIcon sx={{ color: '#558b2f' }} />
-                                            </InputAdornment>
-                                        ),
-                                    }}
-                                    sx={inputStyle}
-                                />
-
-                                <TextField
-                                    fullWidth
-                                    required
-                                    label="Last Name"
-                                    variant="outlined"
-                                    value={lastName}
-                                    onChange={(e) => setLastName(e.target.value)}
-                                    InputProps={{
-                                        startAdornment: (
-                                            <InputAdornment position="start">
-                                                <PersonIcon sx={{ color: '#558b2f' }} />
-                                            </InputAdornment>
-                                        ),
-                                    }}
-                                    sx={inputStyle}
-                                />
-                            </Box>
 
                             <TextField
                                 fullWidth
                                 required
-                                label="Email"
+                                label="Name"
                                 variant="outlined"
-                                type="email"
-                                margin="normal"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
                                 InputProps={{
                                     startAdornment: (
                                         <InputAdornment position="start">
-                                            <EmailIcon sx={{ color: '#558b2f' }} />
+                                            <PersonIcon sx={{ color: '#558b2f' }} />
                                         </InputAdornment>
                                     ),
                                 }}
-                                sx={inputStyle}
+                                sx={{ ...inputStyle, mb: 2 }}
                             />
 
-                            <Box sx={{ display: 'flex', gap: 2, mb: 2, mt: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
+                            <TextField
+                                fullWidth
+                                required
+                                label="City"
+                                variant="outlined"
+                                value={city}
+                                onChange={(e) => setCity(e.target.value)}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <LocationCityIcon sx={{ color: '#558b2f' }} />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                                sx={{ ...inputStyle, mb: 2 }}
+                            />
+
+                            <TextField
+                                fullWidth
+                                required
+                                label="Address"
+                                variant="outlined"
+                                multiline
+                                rows={3}
+                                value={address}
+                                onChange={(e) => setAddress(e.target.value)}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <HomeIcon sx={{ color: '#558b2f', mt: 1.5 }} />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                                sx={{
+                                    ...inputStyle,
+                                    mb: 2,
+                                    '& .MuiInputBase-root': {
+                                        alignItems: 'flex-start'
+                                    }
+                                }}
+                            />
+
+                            <Box sx={{ display: 'flex', gap: 2, mb: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
                                 <TextField
                                     fullWidth
                                     required
@@ -323,167 +400,318 @@ export default function UserRegistration() {
 
                             <Divider sx={{ my: 2 }} />
 
-                            <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
-                                Location Details
+                            <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 2 }}>
+                                Account Details
                             </Typography>
 
                             <TextField
                                 fullWidth
                                 required
-                                label="City"
+                                label="Username"
                                 variant="outlined"
-                                value={city}
-                                onChange={(e) => setCity(e.target.value)}
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
                                 InputProps={{
                                     startAdornment: (
                                         <InputAdornment position="start">
-                                            <LocationCityIcon sx={{ color: '#558b2f' }} />
+                                            <PersonIcon sx={{ color: '#558b2f' }} />
                                         </InputAdornment>
                                     ),
                                 }}
-                                sx={{
-                                    ...inputStyle,
-                                    mb: 2
-                                }}
+                                sx={{ ...inputStyle, mb: 2 }}
                             />
 
-                            {/* Enhanced Address field with more space */}
-                            <TextField
-                                fullWidth
-                                required
-                                label="Address"
-                                variant="outlined"
-                                multiline
-                                rows={4}
-                                value={address}
-                                onChange={(e) => setAddress(e.target.value)}
-                                InputProps={{
-                                    startAdornment: (
-                                        <InputAdornment position="start">
-                                            <HomeIcon sx={{ color: '#558b2f', mt: 1.5 }} />
-                                        </InputAdornment>
-                                    ),
-                                }}
-                                sx={{
-                                    ...inputStyle,
-                                    mb: 2,
-                                    '& .MuiInputBase-root': {
-                                        alignItems: 'flex-start'
-                                    }
-                                }}
-                            />
+                            <Box sx={{ display: 'flex', gap: 2, mb: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
+                                <TextField
+                                    fullWidth
+                                    required
+                                    type="password"
+                                    label="Password"
+                                    variant="outlined"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    InputProps={{
+                                        startAdornment: (
+                                            <InputAdornment position="start">
+                                                <LockIcon sx={{ color: '#558b2f' }} />
+                                            </InputAdornment>
+                                        ),
+                                    }}
+                                    sx={inputStyle}
+                                />
 
-                            <TextField
-                                fullWidth
-                                label="Shop/Farm Name"
-                                variant="outlined"
-                                margin="normal"
-                                value={shopOrFarmName}
-                                onChange={(e) => setShopOrFarmName(e.target.value)}
-                                InputProps={{
-                                    startAdornment: (
-                                        <InputAdornment position="start">
-                                            <StoreIcon sx={{ color: '#558b2f' }} />
-                                        </InputAdornment>
-                                    ),
-                                }}
-                                sx={inputStyle}
-                            />
+                                <TextField
+                                    fullWidth
+                                    required
+                                    type="password"
+                                    label="Confirm Password"
+                                    variant="outlined"
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    InputProps={{
+                                        startAdornment: (
+                                            <InputAdornment position="start">
+                                                <LockIcon sx={{ color: '#558b2f' }} />
+                                            </InputAdornment>
+                                        ),
+                                    }}
+                                    sx={inputStyle}
+                                />
+                            </Box>
 
-                            <TextField
-                                fullWidth
-                                label="Description"
-                                variant="outlined"
-                                margin="normal"
-                                multiline
-                                rows={3}
-                                value={description}
-                                onChange={(e) => setDescription(e.target.value)}
-                                InputProps={{
-                                    startAdornment: (
-                                        <InputAdornment position="start">
-                                            <DescriptionIcon sx={{ color: '#558b2f', mt: 1.5 }} />
-                                        </InputAdornment>
-                                    ),
-                                }}
-                                sx={{
-                                    ...inputStyle,
-                                    '& .MuiInputBase-root': {
-                                        alignItems: 'flex-start'
-                                    }
-                                }}
-                            />
-
-                            <Divider sx={{ my: 2 }} />
-
-                            <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
-                                Account Security
-                            </Typography>
-
-                            <TextField
-                                fullWidth
-                                required
-                                type="password"
-                                label="Password"
-                                variant="outlined"
-                                margin="normal"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                InputProps={{
-                                    startAdornment: (
-                                        <InputAdornment position="start">
-                                            <LockIcon sx={{ color: '#558b2f' }} />
-                                        </InputAdornment>
-                                    ),
-                                }}
-                                sx={inputStyle}
-                            />
-
-                            <TextField
-                                fullWidth
-                                required
-                                type="password"
-                                label="Confirm Password"
-                                variant="outlined"
-                                margin="normal"
-                                value={confirmPassword}
-                                onChange={(e) => setConfirmPassword(e.target.value)}
-                                InputProps={{
-                                    startAdornment: (
-                                        <InputAdornment position="start">
-                                            <LockIcon sx={{ color: '#558b2f' }} />
-                                        </InputAdornment>
-                                    ),
-                                }}
-                                sx={inputStyle}
-                            />
-
-                            <FormControl fullWidth margin="normal">
-                                <InputLabel id="user-role-label" sx={{
+                            <FormControl fullWidth sx={{ mb: 2 }}>
+                                <InputLabel id="roles-label" sx={{
                                     '&.Mui-focused': { color: '#2e7d32' }
                                 }}>
-                                    I am a
+                                    Select Roles *
                                 </InputLabel>
                                 <Select
-                                    labelId="user-role-label"
-                                    value={userRole}
-                                    label="I am a"
-                                    onChange={(e) => setUserRole(e.target.value)}
+                                    labelId="roles-label"
+                                    multiple
+                                    value={selectedRoles}
+                                    onChange={handleRoleChange}
+                                    label="Select Roles *"
+                                    renderValue={(selected) => (
+                                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                            {selected.map((value) => (
+                                                <Chip key={value} label={value} size="small" />
+                                            ))}
+                                        </Box>
+                                    )}
                                     sx={{
                                         '& .MuiOutlinedInput-notchedOutline': {
                                             borderColor: '#c8e6c9',
-                                            '&:hover': {
-                                                borderColor: '#81c784',
-                                            }
+                                        },
+                                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                                            borderColor: '#81c784',
+                                        },
+                                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                            borderColor: '#2e7d32',
                                         }
                                     }}
                                 >
-                                    <MenuItem value="farmer">Farmer</MenuItem>
-                                    <MenuItem value="buyer">Buyer</MenuItem>
-                                    <MenuItem value="admin">Admin</MenuItem>
+                                    {availableRoles.map((role) => (
+                                        <MenuItem key={role.id} value={role.name}>
+                                            {role.name.charAt(0).toUpperCase() + role.name.slice(1)}
+                                        </MenuItem>
+                                    ))}
                                 </Select>
-                                <FormHelperText>Select your primary role in the system</FormHelperText>
+                                <FormHelperText>Select one or more roles</FormHelperText>
                             </FormControl>
+
+                            <Divider sx={{ my: 2 }} />
+
+                            {/* Community Member Section */}
+                            <Box sx={{ mb: 2 }}>
+                                <FormControlLabel
+                                    control={
+                                        <Checkbox
+                                            checked={isCommunityMember}
+                                            onChange={(e) => setIsCommunityMember(e.target.checked)}
+                                            sx={{
+                                                color: '#558b2f',
+                                                '&.Mui-checked': {
+                                                    color: '#2e7d32',
+                                                },
+                                            }}
+                                        />
+                                    }
+                                    label={
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <GroupIcon sx={{ color: '#558b2f' }} />
+                                            <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                                                I am a Community Member
+                                            </Typography>
+                                        </Box>
+                                    }
+                                />
+                            </Box>
+
+                            {/* Community Member Fields - Only show when checkbox is checked */}
+                            {isCommunityMember && (
+                                <Box sx={{ 
+                                    border: '2px solid #c8e6c9', 
+                                    borderRadius: 2, 
+                                    p: 2, 
+                                    mb: 2,
+                                    backgroundColor: '#f1f8e9'
+                                }}>
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 2, color: '#2e7d32' }}>
+                                        Community Member Information
+                                    </Typography>
+
+                                    <Box sx={{ display: 'flex', gap: 2, mb: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
+                                        <TextField
+                                            fullWidth
+                                            required={isCommunityMember}
+                                            label="First Name"
+                                            variant="outlined"
+                                            value={communityFirstName}
+                                            onChange={(e) => setCommunityFirstName(e.target.value)}
+                                            InputProps={{
+                                                startAdornment: (
+                                                    <InputAdornment position="start">
+                                                        <PersonIcon sx={{ color: '#558b2f' }} />
+                                                    </InputAdornment>
+                                                ),
+                                            }}
+                                            sx={inputStyle}
+                                        />
+
+                                        <TextField
+                                            fullWidth
+                                            required={isCommunityMember}
+                                            label="Last Name"
+                                            variant="outlined"
+                                            value={communityLastName}
+                                            onChange={(e) => setCommunityLastName(e.target.value)}
+                                            InputProps={{
+                                                startAdornment: (
+                                                    <InputAdornment position="start">
+                                                        <PersonIcon sx={{ color: '#558b2f' }} />
+                                                    </InputAdornment>
+                                                ),
+                                            }}
+                                            sx={inputStyle}
+                                        />
+                                    </Box>
+
+                                    <TextField
+                                        fullWidth
+                                        required={isCommunityMember}
+                                        label="Email"
+                                        variant="outlined"
+                                        type="email"
+                                        value={communityEmail}
+                                        onChange={(e) => setCommunityEmail(e.target.value)}
+                                        InputProps={{
+                                            startAdornment: (
+                                                <InputAdornment position="start">
+                                                    <EmailIcon sx={{ color: '#558b2f' }} />
+                                                </InputAdornment>
+                                            ),
+                                        }}
+                                        sx={{ ...inputStyle, mb: 2 }}
+                                    />
+
+                                    <TextField
+                                        fullWidth
+                                        required={isCommunityMember}
+                                        label="City"
+                                        variant="outlined"
+                                        value={communityCity}
+                                        onChange={(e) => setCommunityCity(e.target.value)}
+                                        InputProps={{
+                                            startAdornment: (
+                                                <InputAdornment position="start">
+                                                    <LocationCityIcon sx={{ color: '#558b2f' }} />
+                                                </InputAdornment>
+                                            ),
+                                        }}
+                                        sx={{ ...inputStyle, mb: 2 }}
+                                    />
+
+                                    <TextField
+                                        fullWidth
+                                        required={isCommunityMember}
+                                        label="Address"
+                                        variant="outlined"
+                                        multiline
+                                        rows={3}
+                                        value={communityAddress}
+                                        onChange={(e) => setCommunityAddress(e.target.value)}
+                                        InputProps={{
+                                            startAdornment: (
+                                                <InputAdornment position="start">
+                                                    <HomeIcon sx={{ color: '#558b2f', mt: 1.5 }} />
+                                                </InputAdornment>
+                                            ),
+                                        }}
+                                        sx={{
+                                            ...inputStyle,
+                                            mb: 2,
+                                            '& .MuiInputBase-root': {
+                                                alignItems: 'flex-start'
+                                            }
+                                        }}
+                                    />
+
+                                    <TextField
+                                        fullWidth
+                                        label="Shop/Farm Name"
+                                        variant="outlined"
+                                        value={shopOrFarmName}
+                                        onChange={(e) => setShopOrFarmName(e.target.value)}
+                                        InputProps={{
+                                            startAdornment: (
+                                                <InputAdornment position="start">
+                                                    <StoreIcon sx={{ color: '#558b2f' }} />
+                                                </InputAdornment>
+                                            ),
+                                        }}
+                                        sx={{ ...inputStyle, mb: 2 }}
+                                    />
+
+                                    <Box sx={{ display: 'flex', gap: 2, mb: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
+                                        <TextField
+                                            fullWidth
+                                            required={isCommunityMember}
+                                            label="NIC"
+                                            variant="outlined"
+                                            value={communityNic}
+                                            onChange={(e) => setCommunityNic(e.target.value)}
+                                            InputProps={{
+                                                startAdornment: (
+                                                    <InputAdornment position="start">
+                                                        <BadgeIcon sx={{ color: '#558b2f' }} />
+                                                    </InputAdornment>
+                                                ),
+                                            }}
+                                            sx={inputStyle}
+                                        />
+
+                                        <TextField
+                                            fullWidth
+                                            required={isCommunityMember}
+                                            label="Mobile Number"
+                                            variant="outlined"
+                                            value={communityMobileNumber}
+                                            onChange={(e) => setCommunityMobileNumber(e.target.value)}
+                                            InputProps={{
+                                                startAdornment: (
+                                                    <InputAdornment position="start">
+                                                        <PhoneIcon sx={{ color: '#558b2f' }} />
+                                                    </InputAdornment>
+                                                ),
+                                            }}
+                                            sx={inputStyle}
+                                        />
+                                    </Box>
+
+                                    <TextField
+                                        fullWidth
+                                        label="Description"
+                                        variant="outlined"
+                                        multiline
+                                        rows={3}
+                                        value={description}
+                                        onChange={(e) => setDescription(e.target.value)}
+                                        InputProps={{
+                                            startAdornment: (
+                                                <InputAdornment position="start">
+                                                    <DescriptionIcon sx={{ color: '#558b2f', mt: 1.5 }} />
+                                                </InputAdornment>
+                                            ),
+                                        }}
+                                        sx={{
+                                            ...inputStyle,
+                                            '& .MuiInputBase-root': {
+                                                alignItems: 'flex-start'
+                                            }
+                                        }}
+                                    />
+                                </Box>
+                            )}
 
                             <Button
                                 type="submit"

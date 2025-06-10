@@ -6,13 +6,14 @@ body {
   sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: #f8f9fa;
 }
 
 .App {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background-color: #ffffff; /* Add this line */
+  background-color: #f8f9fa;
 }
 
 #root {
@@ -21,7 +22,42 @@ body {
   margin: 0;
   padding: 0;
   text-align: center;
-  background-color: #ffffff;
+  background-color: #f8f9fa;
+}
+
+/* Custom scrollbar styles */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #bdbdbd;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #999;
+}
+
+/* Smooth transitions for all elements */
+* {
+  transition: all 0.2s ease-in-out;
+}
+
+/* Image loading animation */
+@keyframes imageLoad {
+  from { opacity: 0; transform: scale(1.02); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+img {
+  animation: imageLoad 0.3s ease-in-out;
 }
 
 .logo {
