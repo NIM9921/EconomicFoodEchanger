@@ -14,7 +14,7 @@ public class CorsConfig {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/**")
-                        .allowedOrigins("http://localhost:5173","https://ae9d-101-2-191-170.ngrok-free.app") // Your frontend URL
+                        .allowedOrigins("http://localhost:5173","https://ae9d-101-2-191-170.ngrok-free.app","http://192.168.197.4:5173") // Your frontend URL
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                         .allowedHeaders("*")
                         .allowCredentials(true);

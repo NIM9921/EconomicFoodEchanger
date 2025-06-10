@@ -40,7 +40,7 @@ interface FormData {
     image: File | null;
 }
 
-const SharePostForm: React.FC<SharePostFormProps> = ({
+const ShareStoryForm: React.FC<SharePostFormProps> = ({
     open,
     onClose,
     currentUser,
@@ -135,7 +135,7 @@ const SharePostForm: React.FC<SharePostFormProps> = ({
             submitFormData.append('description', formData.description.trim());
             submitFormData.append('image', formData.image!);
 
-            const response = await fetch('http://localhost:8080/sharestory/upload', {
+            const response = await fetch(ApiConfig.Domain+'/sharestory/upload', {
                 method: 'POST',
                 body: submitFormData,
             });
@@ -458,4 +458,4 @@ const SharePostForm: React.FC<SharePostFormProps> = ({
     );
 };
 
-export default SharePostForm;
+export default ShareStoryForm;
