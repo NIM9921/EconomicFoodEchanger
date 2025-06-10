@@ -8,6 +8,7 @@ import PostDialog from './integrations/dialogs/PostDialog';
 import StoryDialog from './integrations/dialogs/StoryDialog';
 import ConnectDialog from './integrations/dialogs/ConnectDialog';
 import UserManagementDialog from './integrations/dialogs/UserManagementDialog';
+import SharePostForm from './integrations/SharePostForm.tsx';
 import { AdminFeature } from './integrations/types';
 
 export default function Integrations() {
@@ -69,15 +70,10 @@ export default function Integrations() {
                 onFeatureClick={handleFeatureClick}
             />
 
-            <PostDialog
+            {/* Replace the old PostDialog with ShareStoryForm */}
+            <SharePostForm
                 open={openDialog === 'post'}
                 onClose={handleCloseDialog}
-                postContent={postContent}
-                setPostContent={setPostContent}
-                previewUrl={previewUrl}
-                setPreviewUrl={setPreviewUrl}
-                setSelectedFile={setSelectedFile}
-                handleFileSelect={handleFileSelect}
             />
 
             <StoryDialog
