@@ -162,21 +162,11 @@ export default function ScrollDialog({
         setIsOpen(open);
     }, [open]);
 
+    // Only close dialog on explicit cancel
     const handleClose = () => {
-        console.log('Closing dialog, bid submitted:', bidSubmittedFlag);
         setIsOpen(false);
-        
-        // Call setOpen with bid submitted flag if provided
-        if (setOpen) {
-            setOpen(false, bidSubmittedFlag);
-        }
-        
-        // Call onClose if provided (for simple close without bid tracking)
-        if (onClose) {
-            onClose();
-        }
-        
-        // Reset flag
+        if (setOpen) setOpen(false, false);
+        if (onClose) onClose();
         setBidSubmittedFlag(false);
     };
 
@@ -322,8 +312,6 @@ export default function ScrollDialog({
                 conformedstate: false
             };
 
-            console.log('Submitting bid:', bidPayload);
-
             const response = await fetch(
                 `${ApiConfig.Domain}/bitdetails/addbit?postid=${postDetails.id}`,
                 {
@@ -340,21 +328,17 @@ export default function ScrollDialog({
                 throw new Error(`Failed to submit bid: ${errorText}`);
             }
 
-            // Handle both JSON and text responses
-            let result;
+            let result: any;
             const contentType = response.headers.get('content-type');
-            
             if (contentType && contentType.includes('application/json')) {
                 result = await response.json();
-                console.log('Bid submitted successfully (JSON):', result);
             } else {
                 result = await response.text();
-                console.log('Bid submitted successfully (Text):', result);
             }
-            
+
             setBidSuccess('Your bid has been submitted successfully!');
             setBidSubmittedFlag(true);
-            
+
             // Reset form after successful submission
             setBidData({
                 bitrate: '',
@@ -363,21 +347,20 @@ export default function ScrollDialog({
                 deliverylocation: ''
             });
 
-            // Trigger bid list refresh
             setRefreshBids(prev => prev + 1);
 
-            // Call parent callback if provided
-            if (onBidSubmitted) {
+            // Call parent callback with the new bid object if available
+            if (onBidSubmitted && typeof result === 'object' && result && result.id) {
+                onBidSubmitted(result);
+            } else if (onBidSubmitted) {
                 onBidSubmitted();
             }
 
-            // Auto-close success message after 3 seconds
             setTimeout(() => {
                 setBidSuccess('');
             }, 3000);
 
         } catch (error) {
-            console.error('Error submitting bid:', error);
             setBidError(error instanceof Error ? error.message : 'Failed to submit bid. Please try again.');
         } finally {
             setIsSubmittingBid(false);
@@ -392,7 +375,7 @@ export default function ScrollDialog({
             aria-describedby="scroll-dialog-description"
             maxWidth="md"
             fullWidth
-            disableEscapeKeyDown={isSubmittingBid} // Prevent ESC key during submission
+            disableEscapeKeyDown={isSubmittingBid}
         >
             <DialogTitle id="scroll-dialog-title" sx={{ p: 2 }}>
                 <Box sx={{ flexGrow: 1 }}>
@@ -733,7 +716,7 @@ export default function ScrollDialog({
             <DialogActions>
                 <Button 
                     onClick={handleClose}
-                    disabled={isSubmittingBid} // Disable cancel during submission
+                    disabled={isSubmittingBid}
                 >
                     {isSubmittingBid ? 'Submitting...' : 'Cancel'}
                 </Button>

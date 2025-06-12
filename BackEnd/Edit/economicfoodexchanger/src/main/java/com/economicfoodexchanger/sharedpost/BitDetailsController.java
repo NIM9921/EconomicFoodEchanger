@@ -36,4 +36,12 @@ public class BitDetailsController {
             return "Upload failed: " + e.getMessage();
         }
     }
+
+
+    @GetMapping("/getbypostid")
+    public List<BitDetails> getByPostId(@RequestParam Integer postid) {
+
+        SharedPost sharedPost = sharedPostDao.getReferenceById(postid);
+        return bitDetailsDao.findBySharedpost(sharedPost);
+    }
 }

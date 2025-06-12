@@ -286,6 +286,36 @@ const VegitablePost: React.FC<SharedPostProps> = ({ post, onBidSubmitted }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [coordinates, setCoordinates] = useState<{lat?: number, lng?: number}>({});
     const [coordinatesLoaded, setCoordinatesLoaded] = useState(false);
+    const [dialogBitDetails, setDialogBitDetails] = useState<BitDetail[]>(post.bitDetails || []);
+    const [successMsg, setSuccessMsg] = useState<string>('');
+    const [lastAddedBid, setLastAddedBid] = useState<BitDetail | null>(null);
+
+    // Fetch updated bit details for this post only
+    const fetchBitDetailsForPost = async () => {
+        try {
+            const response = await fetch(ApiConfig.Domain + `/sharedpost/${post.id}`);
+            if (response.ok) {
+                const data = await response.json();
+                if (data.bitDetails && Array.isArray(data.bitDetails)) {
+                    setDialogBitDetails(data.bitDetails);
+                }
+            }
+        } catch (err) {
+            // Optionally handle error
+        }
+    };
+
+    // Handler for bid submission: update only bit details, not the whole page
+    // Accepts an optional BitDetail object to append immediately
+    const handleBidSubmitted = async (newBid?: BitDetail) => {
+        if (newBid) {
+            // Fire a custom event to append the new bid in BitDealerListTable
+            window.dispatchEvent(new CustomEvent('append-new-bid', { detail: { newBid } }));
+            setSuccessMsg('Your bid has been submitted successfully!');
+            setTimeout(() => setSuccessMsg(''), 3000);
+        }
+    };
+
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -751,16 +781,23 @@ const VegitablePost: React.FC<SharedPostProps> = ({ post, onBidSubmitted }) => {
                 title={post.title}
             />
 
+            {successMsg && (
+                <Box sx={{ mt: 2 }}>
+                    <Typography variant="h6" color="success.main" align="center">
+                        {successMsg}
+                    </Typography>
+                </Box>
+            )}
             {showDialog && (
                 <ScrollDialog 
                     open={showDialog} 
-                    setOpen={(open, bidSubmitted) => {
+                    setOpen={async (open, bidSubmitted, newBid) => {
                         setShowDialog(open);
-                        if (!open && bidSubmitted && onBidSubmitted) {
-                            onBidSubmitted();
+                        if (bidSubmitted && newBid) {
+                            await handleBidSubmitted(newBid);
                         }
                     }}
-                    onClose={() => setShowDialog(false)} // Simple close without callback
+                    onClose={() => setShowDialog(false)}
                     title={post.title}
                     type={category}
                     media={mediaUrls}
@@ -789,11 +826,11 @@ const VegitablePost: React.FC<SharedPostProps> = ({ post, onBidSubmitted }) => {
                                       post.username.communityMember?.longitude
                         },
                         images: mediaUrls,
-                        bidsCount: post.bitDetails?.length || 0,
+                        bidsCount: dialogBitDetails.length,
                         reviewsCount: post.reviews?.length || 0,
-                        bitDetails: post.bitDetails || []
+                        bitDetails: dialogBitDetails
                     }}
-                    onBidSubmitted={onBidSubmitted}
+                    onBidSubmitted={handleBidSubmitted}
                 />
             )}
         </>
