@@ -1,10 +1,8 @@
 package com.economicfoodexchanger.sharedpost;
 
+import com.economicfoodexchanger.UserDao;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 @RestController
@@ -14,12 +12,23 @@ public class BitDetailsController {
     @Autowired
     BitDetailsDao bitDetailsDao;
 
+    @Autowired
+    SharedPostDao sharedPostDao;
+
+    @Autowired
+    UserDao userDao;
+
     @GetMapping("/all")
     public List<BitDetails> getAll() {
         return bitDetailsDao.findAll();
     }
-    @PostMapping("/upload")
-    public String uploadBitDetails(BitDetails bitDetails) {
+
+    @PostMapping("/addbit")
+    public String uploadBitDetails(@RequestBody BitDetails bitDetails, @RequestParam Integer postid) {
+
+        bitDetails.setSharedpost(sharedPostDao.getReferenceById(postid));
+        bitDetails.setUser(userDao.getReferenceById(1));
+        System.out.println(bitDetails.getDeliverylocation());
         try {
             bitDetailsDao.save(bitDetails);
             return "Bit details uploaded successfully!";

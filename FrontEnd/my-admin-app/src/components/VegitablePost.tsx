@@ -17,6 +17,21 @@ import '@fortawesome/fontawesome-free/css/all.min.css';
 import ApiConfig from '../utils/ApiConfig';
 
 // Define interfaces for API data
+interface CommunityMember {
+    id: number;
+    firstName: string;
+    lastName: string;
+    email: string;
+    city: string;
+    address: string;
+    shopOrFarmName: string;
+    nic: string;
+    mobileNumber: string;
+    description: string;
+    latitude?: number;   // Add these in case they exist
+    longitude?: number;
+}
+
 interface User {
     id: number;
     name: string;
@@ -27,10 +42,13 @@ interface User {
     mobileNumber: number;
     username: string;
     password: string;
+    latitude?: number;   
+    longitude?: number;  
     roleList: Array<{
         id: number;
         name: string;
     }>;
+    communityMember?: CommunityMember;  // Add communityMember
 }
 
 interface CategoryStatus {
@@ -51,17 +69,57 @@ export interface SharedPostData {
     title: string;
     discription: string;
     quentity: string;
+    latitude: string;
+    longitude: string;
     image: string | null;
     createdateandtime: string;
     username: User;
-    bitDetails: BitDetails[];
+    bitDetails: BitDetail[]; // Update to use full BitDetail interface
     reviews: Review[];
     categoreyStatus: CategoryStatus | null;
+}
+
+// Add the complete BitDetail interface
+interface BitDetail {
+    id: number;
+    bitrate: number;
+    needamount: number;
+    bitdetailscol: string;
+    deliverylocation: string | null;
+    conformedstate: boolean;
+    user: {
+        id: number;
+        name: string;
+        city: string;
+        address: string;
+        status: boolean;
+        nic: string;
+        mobileNumber: number;
+        username: string;
+        password: string;
+        roleList: Array<{
+            id: number;
+            name: string;
+        }>;
+        communityMember?: {
+            id: number;
+            firstName: string;
+            lastName: string;
+            email: string;
+            city: string;
+            address: string;
+            shopOrFarmName: string;
+            nic: string;
+            mobileNumber: string;
+            description: string;
+        };
+    };
 }
 
 // Props for shared post from API
 export interface SharedPostProps {
     post: SharedPostData;
+    onBidSubmitted?: () => void; // Add callback for bid submission
 }
 
 // Photo Gallery Modal Component
@@ -219,13 +277,15 @@ const PhotoGalleryModal: React.FC<{
 };
 
 // Main VegitablePost Component - Only for Community Posts
-const VegitablePost: React.FC<SharedPostProps> = ({ post }) => {
+const VegitablePost: React.FC<SharedPostProps> = ({ post, onBidSubmitted }) => {
     const [liked, setLiked] = useState(false);
     const [showDialog, setShowDialog] = useState(false);
     const [galleryOpen, setGalleryOpen] = useState(false);
     const [selectedImageIndex, setSelectedImageIndex] = useState(0);
     const [mediaUrls, setMediaUrls] = useState<string[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [coordinates, setCoordinates] = useState<{lat?: number, lng?: number}>({});
+    const [coordinatesLoaded, setCoordinatesLoaded] = useState(false);
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -273,6 +333,92 @@ const VegitablePost: React.FC<SharedPostProps> = ({ post }) => {
     const getUserAvatar = (user: User): string => {
         return `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=4caf50&color=white&size=128`;
     };
+
+    // Function to geocode address to get coordinates
+    const geocodeAddress = async (address: string, city: string) => {
+        try {
+            console.log('Geocoding address:', address, city);
+            const query = encodeURIComponent(`${address}, ${city}, Sri Lanka`);
+            const response = await fetch(
+                `https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=1`
+            );
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.length > 0) {
+                    const result = data[0];
+                    const lat = parseFloat(result.lat);
+                    const lng = parseFloat(result.lon);
+                    console.log('Geocoded coordinates:', { lat, lng });
+                    setCoordinates({ lat, lng });
+                    setCoordinatesLoaded(true);
+                    return { lat, lng };
+                }
+            }
+        } catch (error) {
+            console.error('Geocoding failed:', error);
+        }
+        setCoordinatesLoaded(true);
+        return null;
+    };
+
+    // Load coordinates when component mounts
+    useEffect(() => {
+        const loadCoordinates = () => {
+            // Check if coordinates exist directly on the post
+            if (post.latitude && post.longitude) {
+                const lat = parseFloat(post.latitude);
+                const lng = parseFloat(post.longitude);
+                setCoordinates({ lat, lng });
+                setCoordinatesLoaded(true);
+                console.log('Using post coordinates:', { lat, lng });
+                return;
+            }
+
+            // Fallback: check if coordinates exist in user data
+            if (post.username.latitude && post.username.longitude) {
+                setCoordinates({ 
+                    lat: post.username.latitude, 
+                    lng: post.username.longitude 
+                });
+                setCoordinatesLoaded(true);
+                console.log('Using user coordinates:', { lat: post.username.latitude, lng: post.username.longitude });
+                return;
+            }
+
+            // Fallback: check communityMember for coordinates
+            if (post.username.communityMember?.latitude && post.username.communityMember?.longitude) {
+                setCoordinates({ 
+                    lat: post.username.communityMember.latitude, 
+                    lng: post.username.communityMember.longitude 
+                });
+                setCoordinatesLoaded(true);
+                console.log('Using communityMember coordinates:', { 
+                    lat: post.username.communityMember.latitude, 
+                    lng: post.username.communityMember.longitude 
+                });
+                return;
+            }
+
+            // If no coordinates found, try to geocode the address as fallback
+            const address = post.username.address || post.username.communityMember?.address;
+            const city = post.username.city || post.username.communityMember?.city;
+            
+            if (address && city) {
+                console.log('No coordinates found, attempting to geocode:', { address, city });
+                geocodeAddress(address, city);
+            } else {
+                setCoordinatesLoaded(true);
+            }
+        };
+
+        loadCoordinates();
+    }, [post]);
+
+    // Debug log coordinates when they change
+    useEffect(() => {
+        console.log('VegitablePost coordinates updated:', coordinates);
+    }, [coordinates]);
 
     // Load media information when component mounts
     useEffect(() => {
@@ -608,11 +754,46 @@ const VegitablePost: React.FC<SharedPostProps> = ({ post }) => {
             {showDialog && (
                 <ScrollDialog 
                     open={showDialog} 
-                    setOpen={setShowDialog}
+                    setOpen={(open, bidSubmitted) => {
+                        setShowDialog(open);
+                        if (!open && bidSubmitted && onBidSubmitted) {
+                            onBidSubmitted();
+                        }
+                    }}
+                    onClose={() => setShowDialog(false)} // Simple close without callback
                     title={post.title}
                     type={category}
                     media={mediaUrls}
                     postId={post.id}
+                    postDetails={{
+                        id: post.id,
+                        title: post.title,
+                        description: post.discription,
+                        quantity: post.quentity,
+                        category: category,
+                        timestamp: post.createdateandtime,
+                        user: {
+                            id: post.username.id,
+                            name: post.username.name,
+                            city: post.username.city,
+                            address: post.username.address,
+                            mobileNumber: post.username.mobileNumber,
+                            avatar: getUserAvatar(post.username),
+                            latitude: coordinates.lat || 
+                                     (post.latitude ? parseFloat(post.latitude) : undefined) || 
+                                     post.username.latitude || 
+                                     post.username.communityMember?.latitude,
+                            longitude: coordinates.lng || 
+                                      (post.longitude ? parseFloat(post.longitude) : undefined) || 
+                                      post.username.longitude || 
+                                      post.username.communityMember?.longitude
+                        },
+                        images: mediaUrls,
+                        bidsCount: post.bitDetails?.length || 0,
+                        reviewsCount: post.reviews?.length || 0,
+                        bitDetails: post.bitDetails || []
+                    }}
+                    onBidSubmitted={onBidSubmitted}
                 />
             )}
         </>

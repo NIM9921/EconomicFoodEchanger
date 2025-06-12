@@ -51,6 +51,8 @@ public class SharedPostController {
     @PostMapping(value = "/upload-media", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public String uploadPostWithMedia(@RequestParam("title") String title,
                                       @RequestParam("description") String description,
+                                      @RequestParam("longitude") String longitude,
+                                      @RequestParam("latitude") String latitude,
                                       @RequestParam("quantity") String quantity,
                                       @RequestParam("files") MultipartFile[] files,
                                       @RequestParam(value = "userId", defaultValue = "1") Integer userId,
@@ -59,6 +61,8 @@ public class SharedPostController {
             System.out.println(categoryStatus.toString());
             SharedPost sharedPost = new SharedPost();
             sharedPost.setTitle(title);
+            sharedPost.setLongitude(longitude);
+            sharedPost.setLatitude(latitude);
             sharedPost.setQuentity(quantity);
             sharedPost.setTitle(title);
             sharedPost.setDiscription(description);
