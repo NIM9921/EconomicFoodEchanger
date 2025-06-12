@@ -1,5 +1,6 @@
 package com.economicfoodexchanger.sharedpost;
 
+import com.economicfoodexchanger.User;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 
@@ -30,6 +31,9 @@ public class BitDetails {
     @Column(name = "bitdetailscol", length = 255)
     private String bitdetailscol;
 
+    @Column(name = "deliverylocation", length = 45)
+    private String deliverylocation;
+
     @Column(name = "conformedstate")
     private boolean conformedstate;
 
@@ -38,4 +42,7 @@ public class BitDetails {
     @JoinColumn(name = "sharedpost_id", referencedColumnName = "id")
     private SharedPost sharedpost;
 
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "user_id", referencedColumnName = "id")
+    private User user;
 }

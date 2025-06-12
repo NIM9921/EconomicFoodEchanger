@@ -7,291 +7,402 @@ import {
     DialogContent,
     DialogActions,
     Button,
-    Typography,
     Box,
-    Grid,
+    Typography,
     Avatar,
-    Rating,
-    Chip,
-    Divider,
     Card,
     CardContent,
+    Grid,
+    Chip,
+    Divider,
     IconButton,
     Stack,
-    TextField
+    Rating,
+    Paper
 } from '@mui/material';
 import {
     Close as CloseIcon,
+    Person as PersonIcon,
     Phone as PhoneIcon,
-    Message as MessageIcon,
-    Verified as VerifiedIcon,
-    LocalShipping as ShippingIcon,
-    CalendarToday as CalendarIcon,
-    AttachMoney as AttachMoneyIcon
+    Email as EmailIcon,
+    LocationOn as LocationOnIcon,
+    Business as BusinessIcon,
+    Description as DescriptionIcon,
+    MonetizationOn as MonetizationOnIcon,
+    LocalShipping as LocalShippingIcon,
+    CheckCircle as CheckCircleIcon,
+    Schedule as ScheduleIcon,
+    ContactPhone as ContactPhoneIcon
 } from '@mui/icons-material';
+
+// Interface for bit details from API
+interface BitDetail {
+    id: number;
+    bitrate: number;
+    needamount: number;
+    bitdetailscol: string;
+    deliverylocation: string | null;
+    conformedstate: boolean;
+    user: {
+        id: number;
+        name: string;
+        city: string;
+        address: string;
+        status: boolean;
+        nic: string;
+        mobileNumber: number;
+        username: string;
+        password: string;
+        roleList: Array<{
+            id: number;
+            name: string;
+        }>;
+        communityMember?: {
+            id: number;
+            firstName: string;
+            lastName: string;
+            email: string;
+            city: string;
+            address: string;
+            shopOrFarmName: string;
+            nic: string;
+            mobileNumber: string;
+            description: string;
+        };
+    };
+}
 
 interface MoreInfoDealProps {
     open: boolean;
     onClose: () => void;
     dealId: number;
+    bitDetail?: BitDetail;
 }
 
-interface DealDetailsType {
-    id: number;
-    dealerName: string;
-    avatar: string;
-    rating: number;
-    soldCount: number;
-    location: string;
-    quantity: number;
-    pricePerUnit: number;
-    totalPrice: number;
-    status: 'pending' | 'accepted' | 'rejected';
-    description: string;
-    expectedDeliveryDate: string;
-    paymentMethod: string;
-    qualityCertifications: string[];
-    contactPhone: string;
-}
-
-// Sample data - in a real app this would be fetched based on dealId
-const getDealDetails = (id: number): DealDetailsType => {
-    return {
-        id,
-        dealerName: "Sarah Johnson",
-        avatar: "https://randomuser.me/api/portraits/women/2.jpg",
-        rating: 4.8,
-        soldCount: 56,
-        location: "Kandy, Sri Lanka",
-        quantity: 50,
-        pricePerUnit: 110,
-        totalPrice: 5500,
-        status: "accepted",
-        description: "Premium quality organic vegetables grown without pesticides. Perfect for restaurants and health food stores.",
-        expectedDeliveryDate: "2023-07-15",
-        paymentMethod: "Bank Transfer/Cash on Delivery",
-        qualityCertifications: ["Organic Certified", "ISO 22000", "GMP"],
-        contactPhone: "+94 76 123 4567"
-    };
-};
-
-export default function MoreInfoDeal({ open, onClose, dealId }: MoreInfoDealProps) {
-    const [dealDetails] = useState<DealDetailsType>(getDealDetails(dealId));
-    const [messageText, setMessageText] = useState('');
-
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
+export default function MoreInfoDeal({ open, onClose, dealId, bitDetail }: MoreInfoDealProps) {
+    // Function to get user avatar
+    const getUserAvatar = (user: BitDetail['user']): string => {
+        return `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=4caf50&color=white&size=128`;
     };
 
-    const handleSendMessage = () => {
-        if (messageText.trim()) {
-            // Implement message sending logic here
-            alert(`Message sent: ${messageText}`);
-            setMessageText('');
-        }
+    // Function to get user roles as string
+    const getUserRoles = (roleList: Array<{id: number, name: string}>): string => {
+        return roleList.map(role => role.name).join(', ');
     };
+
+    // Function to get status info
+    const getStatusInfo = (conformedstate: boolean) => {
+        return conformedstate 
+            ? { label: 'Accepted', color: 'success' as const, icon: <CheckCircleIcon /> }
+            : { label: 'Pending', color: 'warning' as const, icon: <ScheduleIcon /> };
+    };
+
+    if (!bitDetail) {
+        return (
+            <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+                <DialogContent>
+                    <Typography>No bid details available.</Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={onClose}>Close</Button>
+                </DialogActions>
+            </Dialog>
+        );
+    }
+
+    const statusInfo = getStatusInfo(bitDetail.conformedstate);
+    const user = bitDetail.user;
+    const communityMember = user.communityMember;
 
     return (
         <Dialog
             open={open}
             onClose={onClose}
+            maxWidth="lg"
             fullWidth
-            maxWidth="md"
+            PaperProps={{
+                sx: {
+                    borderRadius: 3,
+                    maxHeight: '90vh'
+                }
+            }}
         >
-            <DialogTitle sx={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                bgcolor: 'primary.main',
-                color: 'white'
-            }}>
-                <Typography variant="h6">Deal Details</Typography>
-                <IconButton onClick={onClose} sx={{ color: 'white' }}>
+            <DialogTitle
+                sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    bgcolor: 'primary.main',
+                    color: 'white',
+                    py: 2
+                }}
+            >
+                <Typography variant="h6" fontWeight="bold">
+                    Bid Details - #{dealId}
+                </Typography>
+                <IconButton
+                    onClick={onClose}
+                    sx={{ 
+                        color: 'white',
+                        '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
+                    }}
+                >
                     <CloseIcon />
                 </IconButton>
             </DialogTitle>
 
-            <DialogContent dividers>
+            <DialogContent sx={{ p: 3 }}>
                 <Grid container spacing={3}>
-                    {/* Dealer Info Section */}
-                    <Grid item xs={12}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                            <Avatar
-                                src={dealDetails.avatar}
-                                sx={{ width: 64, height: 64, mr: 2 }}
-                            />
-                            <Box>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <Typography variant="h6">{dealDetails.dealerName}</Typography>
-                                    <VerifiedIcon color="primary" fontSize="small" />
-                                </Box>
-                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                    <Rating value={dealDetails.rating} precision={0.1} readOnly size="small" />
-                                    <Typography variant="body2" sx={{ ml: 1 }}>
-                                        ({dealDetails.rating}) • {dealDetails.soldCount} sales
-                                    </Typography>
-                                </Box>
-                                <Typography variant="body2" color="text.secondary">
-                                    {dealDetails.location}
-                                </Typography>
-                            </Box>
-                        </Box>
-                    </Grid>
-
-                    <Grid item xs={12}>
-                        <Divider />
-                    </Grid>
-
-                    {/* Deal Status */}
-                    <Grid item xs={12}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Typography variant="subtitle1">Deal Status</Typography>
-                            <Chip
-                                label={dealDetails.status.toUpperCase()}
-                                color={
-                                    dealDetails.status === 'accepted' ? 'success' :
-                                        dealDetails.status === 'rejected' ? 'error' : 'warning'
-                                }
-                            />
-                        </Box>
-                    </Grid>
-
-                    {/* Deal Details Cards */}
+                    {/* Bidder Information */}
                     <Grid item xs={12} md={6}>
-                        <Card variant="outlined">
+                        <Card elevation={2} sx={{ height: '100%' }}>
                             <CardContent>
-                                <Typography variant="subtitle1" gutterBottom>
-                                    <AttachMoneyIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
-                                    Order Details
-                                </Typography>
-                                <Grid container spacing={1}>
-                                    <Grid item xs={6}>
-                                        <Typography variant="body2" color="text.secondary">Quantity:</Typography>
-                                    </Grid>
-                                    <Grid item xs={6}>
-                                        <Typography variant="body2">{dealDetails.quantity} kg</Typography>
-                                    </Grid>
-                                    <Grid item xs={6}>
-                                        <Typography variant="body2" color="text.secondary">Price per Unit:</Typography>
-                                    </Grid>
-                                    <Grid item xs={6}>
-                                        <Typography variant="body2">Rs. {dealDetails.pricePerUnit}</Typography>
-                                    </Grid>
-                                    <Grid item xs={6}>
-                                        <Typography variant="body2" color="text.secondary">Total Price:</Typography>
-                                    </Grid>
-                                    <Grid item xs={6}>
-                                        <Typography variant="body1" fontWeight="bold">Rs. {dealDetails.totalPrice}</Typography>
-                                    </Grid>
-                                    <Grid item xs={6}>
-                                        <Typography variant="body2" color="text.secondary">Payment Method:</Typography>
-                                    </Grid>
-                                    <Grid item xs={6}>
-                                        <Typography variant="body2">{dealDetails.paymentMethod}</Typography>
-                                    </Grid>
-                                </Grid>
-                            </CardContent>
-                        </Card>
-                    </Grid>
-
-                    <Grid item xs={12} md={6}>
-                        <Card variant="outlined">
-                            <CardContent>
-                                <Typography variant="subtitle1" gutterBottom>
-                                    <ShippingIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
-                                    Delivery Information
-                                </Typography>
-                                <Grid container spacing={1}>
-                                    <Grid item xs={6}>
-                                        <Typography variant="body2" color="text.secondary">Expected Delivery:</Typography>
-                                    </Grid>
-                                    <Grid item xs={6}>
-                                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                            <CalendarIcon fontSize="small" sx={{ mr: 0.5 }} />
-                                            <Typography variant="body2">{formatDate(dealDetails.expectedDeliveryDate)}</Typography>
-                                        </Box>
-                                    </Grid>
-                                    <Grid item xs={12} sx={{ mt: 1 }}>
-                                        <Typography variant="body2" color="text.secondary">Quality Certifications:</Typography>
-                                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                                            {dealDetails.qualityCertifications.map((cert, index) => (
-                                                <Chip key={index} label={cert} size="small" />
-                                            ))}
-                                        </Box>
-                                    </Grid>
-                                </Grid>
-                            </CardContent>
-                        </Card>
-                    </Grid>
-
-                    {/* Description */}
-                    <Grid item xs={12}>
-                        <Card variant="outlined">
-                            <CardContent>
-                                <Typography variant="subtitle1" gutterBottom>Description</Typography>
-                                <Typography variant="body2">{dealDetails.description}</Typography>
-                            </CardContent>
-                        </Card>
-                    </Grid>
-
-                    {/* Contact Section */}
-                    <Grid item xs={12}>
-                        <Card variant="outlined">
-                            <CardContent>
-                                <Typography variant="subtitle1" gutterBottom>Contact Dealer</Typography>
-                                <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
-                                    <Button
-                                        variant="outlined"
-                                        startIcon={<PhoneIcon />}
-                                        href={`tel:${dealDetails.contactPhone}`}
+                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                                    <Avatar
+                                        src={getUserAvatar(user)}
+                                        alt={user.name}
+                                        sx={{ width: 80, height: 80, mr: 2 }}
                                     >
-                                        Call
-                                    </Button>
-                                    <Button variant="contained" startIcon={<MessageIcon />}>
-                                        Chat
-                                    </Button>
-                                </Stack>
-                                <Box sx={{ mt: 2 }}>
-                                    <TextField
-                                        fullWidth
-                                        variant="outlined"
-                                        label="Send a message"
-                                        placeholder="Type your message here..."
-                                        multiline
-                                        rows={2}
-                                        value={messageText}
-                                        onChange={(e) => setMessageText(e.target.value)}
-                                    />
-                                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
-                                        <Button
-                                            variant="contained"
-                                            size="small"
-                                            onClick={handleSendMessage}
-                                            disabled={!messageText.trim()}
-                                        >
-                                            Send
-                                        </Button>
+                                        <PersonIcon sx={{ fontSize: 40 }} />
+                                    </Avatar>
+                                    <Box>
+                                        <Typography variant="h6" fontWeight="bold">
+                                            {user.name}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            @{user.username}
+                                        </Typography>
+                                        <Rating value={4.2} precision={0.1} size="small" readOnly sx={{ mt: 0.5 }} />
+                                        <Box sx={{ mt: 1 }}>
+                                            <Chip
+                                                label={getUserRoles(user.roleList)}
+                                                size="small"
+                                                color="primary"
+                                                variant="outlined"
+                                            />
+                                        </Box>
                                     </Box>
                                 </Box>
+
+                                <Divider sx={{ mb: 2 }} />
+
+                                <Stack spacing={2}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                        <PhoneIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                                        <Typography variant="body2">
+                                            <strong>Phone:</strong> {user.mobileNumber}
+                                        </Typography>
+                                    </Box>
+
+                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                        <LocationOnIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                                        <Typography variant="body2">
+                                            <strong>Location:</strong> {user.city}
+                                        </Typography>
+                                    </Box>
+
+                                    <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                                        <LocationOnIcon sx={{ mr: 1, color: 'text.secondary', mt: 0.2 }} />
+                                        <Typography variant="body2">
+                                            <strong>Address:</strong> {user.address}
+                                        </Typography>
+                                    </Box>
+
+                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                        <PersonIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                                        <Typography variant="body2">
+                                            <strong>NIC:</strong> {user.nic}
+                                        </Typography>
+                                    </Box>
+                                </Stack>
                             </CardContent>
                         </Card>
                     </Grid>
+
+                    {/* Bid Information */}
+                    <Grid item xs={12} md={6}>
+                        <Card elevation={2} sx={{ height: '100%' }}>
+                            <CardContent>
+                                <Typography variant="h6" fontWeight="bold" gutterBottom>
+                                    Bid Information
+                                </Typography>
+
+                                <Stack spacing={2}>
+                                    <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                                            <MonetizationOnIcon sx={{ mr: 1, color: 'success.main' }} />
+                                            <Typography variant="subtitle1" fontWeight="bold">
+                                                Price Details
+                                            </Typography>
+                                        </Box>
+                                        <Typography variant="body2">
+                                            Rate per Unit: <strong>Rs. {bitDetail.bitrate.toFixed(2)}</strong>
+                                        </Typography>
+                                        <Typography variant="body2">
+                                            Quantity: <strong>{bitDetail.needamount} kg</strong>
+                                        </Typography>
+                                        <Typography variant="h6" color="primary.main" sx={{ mt: 1 }}>
+                                            Total: Rs. {(bitDetail.bitrate * bitDetail.needamount).toFixed(2)}
+                                        </Typography>
+                                    </Paper>
+
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        {statusInfo.icon}
+                                        <Typography variant="body2">
+                                            <strong>Status:</strong>
+                                        </Typography>
+                                        <Chip
+                                            label={statusInfo.label}
+                                            color={statusInfo.color}
+                                            size="small"
+                                        />
+                                    </Box>
+
+                                    {bitDetail.deliverylocation && (
+                                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                            <LocalShippingIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                                            <Typography variant="body2">
+                                                <strong>Delivery Location:</strong> {bitDetail.deliverylocation}
+                                            </Typography>
+                                        </Box>
+                                    )}
+
+                                    {bitDetail.bitdetailscol && (
+                                        <Paper sx={{ p: 2, bgcolor: 'info.50', border: '1px solid', borderColor: 'info.200' }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                                                <ContactPhoneIcon sx={{ mr: 1, color: 'info.main' }} />
+                                                <Typography variant="subtitle2" fontWeight="bold">
+                                                    Contact Details & Notes
+                                                </Typography>
+                                            </Box>
+                                            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                                                {bitDetail.bitdetailscol}
+                                            </Typography>
+                                        </Paper>
+                                    )}
+                                </Stack>
+                            </CardContent>
+                        </Card>
+                    </Grid>
+
+                    {/* Community Member Information (if available) */}
+                    {communityMember && (
+                        <Grid item xs={12}>
+                            <Card elevation={2}>
+                                <CardContent>
+                                    <Typography variant="h6" fontWeight="bold" gutterBottom>
+                                        Community Member Details
+                                    </Typography>
+
+                                    <Grid container spacing={2}>
+                                        <Grid item xs={12} sm={6}>
+                                            <Stack spacing={1.5}>
+                                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                    <PersonIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                                                    <Typography variant="body2">
+                                                        <strong>Full Name:</strong> {communityMember.firstName} {communityMember.lastName}
+                                                    </Typography>
+                                                </Box>
+
+                                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                    <EmailIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                                                    <Typography variant="body2">
+                                                        <strong>Email:</strong> {communityMember.email}
+                                                    </Typography>
+                                                </Box>
+
+                                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                    <PhoneIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                                                    <Typography variant="body2">
+                                                        <strong>Mobile:</strong> {communityMember.mobileNumber}
+                                                    </Typography>
+                                                </Box>
+
+                                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                    <BusinessIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                                                    <Typography variant="body2">
+                                                        <strong>Shop/Farm:</strong> {communityMember.shopOrFarmName}
+                                                    </Typography>
+                                                </Box>
+                                            </Stack>
+                                        </Grid>
+
+                                        <Grid item xs={12} sm={6}>
+                                            <Stack spacing={1.5}>
+                                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                    <LocationOnIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                                                    <Typography variant="body2">
+                                                        <strong>City:</strong> {communityMember.city}
+                                                    </Typography>
+                                                </Box>
+
+                                                <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                                                    <LocationOnIcon sx={{ mr: 1, color: 'text.secondary', mt: 0.2 }} />
+                                                    <Typography variant="body2">
+                                                        <strong>Address:</strong> {communityMember.address}
+                                                    </Typography>
+                                                </Box>
+
+                                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                    <PersonIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                                                    <Typography variant="body2">
+                                                        <strong>NIC:</strong> {communityMember.nic}
+                                                    </Typography>
+                                                </Box>
+                                            </Stack>
+                                        </Grid>
+
+                                        {communityMember.description && (
+                                            <Grid item xs={12}>
+                                                <Box sx={{ display: 'flex', alignItems: 'flex-start', mt: 1 }}>
+                                                    <DescriptionIcon sx={{ mr: 1, color: 'text.secondary', mt: 0.2 }} />
+                                                    <Typography variant="body2">
+                                                        <strong>Description:</strong> {communityMember.description}
+                                                    </Typography>
+                                                </Box>
+                                            </Grid>
+                                        )}
+                                    </Grid>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+                    )}
                 </Grid>
             </DialogContent>
 
-            <DialogActions>
-                <Button onClick={onClose} color="inherit">Close</Button>
+            <DialogActions sx={{ p: 3, pt: 1 }}>
                 <Button
-                    variant="contained"
-                    color={dealDetails.status === 'accepted' ? 'primary' : 'success'}
-                    disabled={dealDetails.status === 'rejected'}
+                    variant="outlined"
+                    onClick={onClose}
+                    sx={{ minWidth: 100 }}
                 >
-                    {dealDetails.status === 'accepted' ? 'View Contract' : 'Accept Deal'}
+                    Close
                 </Button>
+                {!bitDetail.conformedstate && (
+                    <>
+                        <Button
+                            variant="outlined"
+                            color="error"
+                            sx={{ minWidth: 100 }}
+                        >
+                            Reject
+                        </Button>
+                        <Button
+                            variant="contained"
+                            color="success"
+                            sx={{ minWidth: 100 }}
+                        >
+                            Accept Bid
+                        </Button>
+                    </>
+                )}
+                {bitDetail.conformedstate && (
+                    <Chip
+                        label="Bid Accepted"
+                        color="success"
+                        icon={<CheckCircleIcon />}
+                    />
+                )}
             </DialogActions>
         </Dialog>
     );
