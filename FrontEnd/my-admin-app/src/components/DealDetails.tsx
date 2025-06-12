@@ -22,70 +22,152 @@ import Rating from "@mui/material/Rating";
 import TurnedInNotIcon from "@mui/icons-material/TurnedInNot";
 import HandshakeIcon from "@mui/icons-material/Handshake";
 import BitDealerListTable from './BitDealerListTable';
+import LaunchIcon from "@mui/icons-material/Launch";
+import { Alert } from "@mui/material";
+import ApiConfig from '../utils/ApiConfig';
 
 const AutoPlaySwipeableViews = autoPlay(SwipeableViews);
 
-// Remove unused Item component or use it somewhere
-/*
-interface ItemProps {
-  children: React.ReactNode;
+interface PostUser {
+    id: number;
+    name: string;
+    city: string;
+    address: string;
+    mobileNumber: number;
+    avatar: string;
+    latitude?: number;  // Add latitude
+    longitude?: number; // Add longitude
 }
 
-const Item = (props: ItemProps) => {
-  return (
-    <Paper
-      sx={{
-        padding: 2,
-        textAlign: "left",
-        height: "100%",
-      }}
-      elevation={0}
-    >
-      {props.children}
-    </Paper>
-  );
-};
-*/
+interface PostDetails {
+    id: number;
+    title: string;
+    description: string;
+    quantity: string;
+    category: 'buying' | 'selling';
+    timestamp: string;
+    user: PostUser;
+    images: string[];
+    bidsCount: number;
+    reviewsCount: number;
+    bitDetails?: BitDetail[]; // Add bitDetails to PostDetails interface
+}
 
-const images = [
-    {
-        label: "Image 1",
-        imgPath: "https://images.unsplash.com/photo-1576045057995-568f588f82fb",
-    },
-    {
-        label: "Image 2",
-        imgPath: "https://images.unsplash.com/photo-1598170845058-32b9d6a5da37",
-    },
-    {
-        label: "Image 3",
-        imgPath: "https://images.unsplash.com/photo-1576045057995-568f588f82fb",
-    },
-    {
-        label: "Image 4",
-        imgPath: "https://images.unsplash.com/photo-1598170845058-32b9d6a5da37",
-    },
-];
+// Add the BitDetail interface
+interface BitDetail {
+    id: number;
+    bitrate: number;
+    needamount: number;
+    bitdetailscol: string;
+    deliverylocation: string | null;
+    conformedstate: boolean;
+    user: {
+        id: number;
+        name: string;
+        city: string;
+        address: string;
+        status: boolean;
+        nic: string;
+        mobileNumber: number;
+        username: string;
+        password: string;
+        roleList: Array<{
+            id: number;
+            name: string;
+        }>;
+        communityMember?: {
+            id: number;
+            firstName: string;
+            lastName: string;
+            email: string;
+            city: string;
+            address: string;
+            shopOrFarmName: string;
+            nic: string;
+            mobileNumber: string;
+            description: string;
+        };
+    };
+}
 
 // Props interface for the ScrollDialog component
 interface ScrollDialogProps {
     open?: boolean;
+    setOpen?: (open: boolean, bidSubmitted?: boolean) => void;
     onClose?: () => void;
+    title?: string;
+    type?: 'buying' | 'selling';
+    media?: string[];
+    postId?: number;
+    postDetails?: PostDetails;
+    onBidSubmitted?: () => void; // Add callback prop
 }
 
-export default function ScrollDialog({ open = true, onClose }: ScrollDialogProps) {
+export default function ScrollDialog({ 
+    open = true, 
+    setOpen, 
+    onClose,
+    title,
+    type,
+    media,
+    postId,
+    postDetails,
+    onBidSubmitted
+}: ScrollDialogProps) {
     const [isOpen, setIsOpen] = React.useState(open);
-    const [scroll] = React.useState<"paper" | "body">("paper"); // Remove setScroll if unused
+    const [scroll] = React.useState<"paper" | "body">("paper");
     const [activeStep, setActiveStep] = React.useState(0);
-    const maxSteps = images.length;
+    const [bidSubmittedFlag, setBidSubmittedFlag] = React.useState(false);
+    const [refreshBids, setRefreshBids] = React.useState(0);
+
+    // Debug logging
+    React.useEffect(() => {
+        console.log('ScrollDialog received props:', {
+            open,
+            title,
+            type,
+            postId,
+            postDetails: postDetails ? 'Present' : 'Missing',
+            mediaCount: media?.length || 0
+        });
+    }, [open, title, type, postId, postDetails, media]);
+
+    // Use provided images or fallback to default images
+    const displayImages = postDetails?.images?.length ? 
+        postDetails.images.map((url, index) => ({
+            label: `Image ${index + 1}`,
+            imgPath: url
+        })) : 
+        media?.length ?
+        media.map((url, index) => ({
+            label: `Image ${index + 1}`,
+            imgPath: url
+        })) :
+        [
+            {
+                label: "Image 1",
+                imgPath: "https://images.unsplash.com/photo-1576045057995-568f588f82fb",
+            },
+            {
+                label: "Image 2",
+                imgPath: "https://images.unsplash.com/photo-1598170845058-32b9d6a5da37",
+            },
+        ];
+
+    const maxSteps = displayImages.length;
 
     // Update internal state when prop changes
     React.useEffect(() => {
+        console.log('Setting dialog open state:', open);
         setIsOpen(open);
     }, [open]);
 
+    // Only close dialog on explicit cancel
     const handleClose = () => {
         setIsOpen(false);
+        if (setOpen) setOpen(false, false);
         if (onClose) onClose();
+        setBidSubmittedFlag(false);
     };
 
     const handleNext = () => {
@@ -110,27 +192,205 @@ export default function ScrollDialog({ open = true, onClose }: ScrollDialogProps
         }
     }, [isOpen]);
 
+    // Debug: Log postDetails to check coordinates
+    React.useEffect(() => {
+        if (postDetails) {
+            console.log('DealDetails - Coordinates received:', {
+                latitude: postDetails.user?.latitude,
+                longitude: postDetails.user?.longitude,
+                latitudeType: typeof postDetails.user?.latitude,
+                longitudeType: typeof postDetails.user?.longitude,
+                address: postDetails.user?.address,
+                city: postDetails.user?.city
+            });
+        }
+    }, [postDetails]);
+
+    // Function to open Google Maps
+    const openInGoogleMaps = () => {
+        if (postDetails?.user?.latitude && postDetails?.user?.longitude) {
+            const lat = postDetails.user.latitude;
+            const lng = postDetails.user.longitude;
+            const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+            window.open(googleMapsUrl, '_blank');
+        } else if (postDetails?.user?.address && postDetails?.user?.city) {
+            const address = encodeURIComponent(`${postDetails.user.address}, ${postDetails.user.city}`);
+            const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${address}`;
+            window.open(googleMapsUrl, '_blank');
+        } else {
+            const city = encodeURIComponent(postDetails?.user?.city || 'Sri Lanka');
+            const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${city}`;
+            window.open(googleMapsUrl, '_blank');
+        }
+    };
+
+    // Generate dynamic map URL with user's location
+    const getMapUrl = () => {
+        console.log('DealDetails - Generating map URL with coordinates:', {
+            lat: postDetails?.user?.latitude,
+            lng: postDetails?.user?.longitude,
+            hasCoordinates: !!(postDetails?.user?.latitude && postDetails?.user?.longitude)
+        });
+
+        if (postDetails?.user?.latitude && postDetails?.user?.longitude) {
+            const lat = postDetails.user.latitude;
+            const lng = postDetails.user.longitude;
+            console.log('DealDetails - Using coordinates for map:', { lat, lng });
+            return `https://maps.google.com/maps?q=${lat},${lng}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
+        } else if (postDetails?.user?.address && postDetails?.user?.city) {
+            console.log('DealDetails - Using address for map:', postDetails.user.address, postDetails.user.city);
+            const address = encodeURIComponent(`${postDetails.user.address}, ${postDetails.user.city}, Sri Lanka`);
+            return `https://maps.google.com/maps?q=${address}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
+        }
+        console.log('DealDetails - Using fallback location');
+        return `https://maps.google.com/maps?q=7.8731,80.7718&t=&z=10&ie=UTF8&iwloc=&output=embed`;
+    };
+
+    console.log('Rendering ScrollDialog with isOpen:', isOpen);
+
+    if (!isOpen) {
+        return null;
+    }
+
+    // Add new state for bid form
+    const [bidData, setBidData] = React.useState({
+        bitrate: '',
+        needamount: '',
+        bitdetailscol: '',
+        deliverylocation: ''
+    });
+    const [isSubmittingBid, setIsSubmittingBid] = React.useState(false);
+    const [bidError, setBidError] = React.useState('');
+    const [bidSuccess, setBidSuccess] = React.useState('');
+
+    // Handle bid form input changes
+    const handleBidInputChange = (field: string, value: string) => {
+        setBidData(prev => ({
+            ...prev,
+            [field]: value
+        }));
+        setBidError(''); // Clear error when user types
+    };
+
+    // Validate bid form
+    const validateBidForm = (): boolean => {
+        if (!bidData.bitrate || parseFloat(bidData.bitrate) <= 0) {
+            setBidError('Please enter a valid price per unit.');
+            return false;
+        }
+        
+        if (!bidData.needamount || parseFloat(bidData.needamount) <= 0) {
+            setBidError('Please enter a valid quantity needed.');
+            return false;
+        }
+
+        if (!bidData.bitdetailscol.trim()) {
+            setBidError('Please enter contact details or special notes.');
+            return false;
+        }
+
+        return true;
+    };
+
+    // Submit bid to backend
+    const handleSubmitBid = async () => {
+        if (!validateBidForm()) return;
+        if (!postDetails?.id) {
+            setBidError('Post ID not available.');
+            return;
+        }
+
+        setIsSubmittingBid(true);
+        setBidError('');
+
+        try {
+            const bidPayload = {
+                bitrate: parseFloat(bidData.bitrate),
+                needamount: parseFloat(bidData.needamount),
+                bitdetailscol: bidData.bitdetailscol.trim(),
+                deliverylocation: bidData.deliverylocation.trim() || null,
+                conformedstate: false
+            };
+
+            const response = await fetch(
+                `${ApiConfig.Domain}/bitdetails/addbit?postid=${postDetails.id}`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(bidPayload)
+                }
+            );
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Failed to submit bid: ${errorText}`);
+            }
+
+            let result: any;
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                result = await response.json();
+            } else {
+                result = await response.text();
+            }
+
+            setBidSuccess('Your bid has been submitted successfully!');
+            setBidSubmittedFlag(true);
+
+            // Reset form after successful submission
+            setBidData({
+                bitrate: '',
+                needamount: '',
+                bitdetailscol: '',
+                deliverylocation: ''
+            });
+
+            setRefreshBids(prev => prev + 1);
+
+            // Call parent callback with the new bid object if available
+            if (onBidSubmitted && typeof result === 'object' && result && result.id) {
+                onBidSubmitted(result);
+            } else if (onBidSubmitted) {
+                onBidSubmitted();
+            }
+
+            setTimeout(() => {
+                setBidSuccess('');
+            }, 3000);
+
+        } catch (error) {
+            setBidError(error instanceof Error ? error.message : 'Failed to submit bid. Please try again.');
+        } finally {
+            setIsSubmittingBid(false);
+        }
+    };
+
     return (
         <Dialog
             open={isOpen}
-            onClose={handleClose}
             scroll={scroll}
             aria-labelledby="scroll-dialog-title"
             aria-describedby="scroll-dialog-description"
             maxWidth="md"
+            fullWidth
+            disableEscapeKeyDown={isSubmittingBid}
         >
             <DialogTitle id="scroll-dialog-title" sx={{ p: 2 }}>
                 <Box sx={{ flexGrow: 1 }}>
                     <Stack direction="row" spacing={2} alignItems="center">
                         <Avatar
                             sx={{ width: 56, height: 56 }}
-                            alt="Remy Sharp"
-                            src="https://images.unsplash.com/photo-1598170845058-32b9d6a5da37"
+                            alt={postDetails?.user?.name || "User"}
+                            src={postDetails?.user?.avatar || "https://images.unsplash.com/photo-1598170845058-32b9d6a5da37"}
                         />
                         <Box sx={{ flexGrow: 1 }}>
-                            <Typography variant="h6">User Name</Typography>
+                            <Typography variant="h6">
+                                {postDetails?.user?.name || "User Name"}
+                            </Typography>
                             <Typography variant="body2" color="text.secondary">
-                                User description or additional info
+                                📍 {postDetails?.user?.city || "Location"} • 📞 {postDetails?.user?.mobileNumber || "Phone"}
                             </Typography>
                             <Rating
                                 name="half-rating-read"
@@ -146,7 +406,9 @@ export default function ScrollDialog({ open = true, onClose }: ScrollDialogProps
                     </Stack>
                 </Box>
             </DialogTitle>
+
             <DialogContent dividers={scroll === "paper"}>
+                {/* Remove the test content and just show normal content */}
                 <Box sx={{ maxWidth: "100%", flexGrow: 1, mb: 3 }}>
                     <Paper
                         square
@@ -159,7 +421,7 @@ export default function ScrollDialog({ open = true, onClose }: ScrollDialogProps
                             bgcolor: "background.default",
                         }}
                     >
-                        <Typography>{images[activeStep].label}</Typography>
+                        <Typography>{displayImages[activeStep]?.label}</Typography>
                     </Paper>
                     <AutoPlaySwipeableViews
                         axis="x"
@@ -167,7 +429,7 @@ export default function ScrollDialog({ open = true, onClose }: ScrollDialogProps
                         onChangeIndex={handleStepChange}
                         enableMouseEvents
                     >
-                        {images.map((step, index) => (
+                        {displayImages.map((step, index) => (
                             <div key={step.label}>
                                 {Math.abs(activeStep - index) <= 2 ? (
                                     <Box
@@ -182,6 +444,9 @@ export default function ScrollDialog({ open = true, onClose }: ScrollDialogProps
                                         }}
                                         src={step.imgPath}
                                         alt={step.label}
+                                        onError={(e) => {
+                                            (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200?text=Image+Not+Available';
+                                        }}
                                     />
                                 ) : null}
                             </div>
@@ -213,85 +478,248 @@ export default function ScrollDialog({ open = true, onClose }: ScrollDialogProps
                         }
                     />
                 </Box>
-                <DialogContentText
-                    id="scroll-dialog-description"
-                    ref={descriptionElementRef}
-                    tabIndex={-1}
-                >
-                    Here's the complete fixed code for the ScrollDialog component. I've
-                    removed the duplicate Box import that was causing the error. The
-                    component should now work correctly, showing a dialog with an image
-                    slider and form fields.
-                </DialogContentText>
-                <Box
-                    component="form"
-                    sx={{
-                        display: "flex",
-                        flexDirection: "column",
-                        width: "100%",
-                        mt: 2,
-                    }}
-                    noValidate
-                    autoComplete="off"
-                >
-                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mb: 2 }}>
-                        <TextField
-                            id="standard-number"
-                            label="Necessary Quantity"
-                            type="number"
-                            variant="standard"
-                            helperText="kg/unit"
-                            sx={{ width: "48%" }}
-                        />
-                        <TextField
-                            id="standard-search"
-                            label="Price Per Unit"
-                            type="search"
-                            variant="standard"
-                            sx={{ width: "48%" }}
-                        />
-                        <TextField
-                            id="standard-search"
-                            label="Delivery Location"
-                            type="search"
-                            variant="standard"
-                            helperText="(optional)"
-                            sx={{ width: "48%" }}
-                        />
-                        <TextField
-                            id="standard-textarea"
-                            label="Special Note"
-                            placeholder="enter your special note if have"
-                            multiline
-                            variant="standard"
-                            helperText="(optional)"
-                            sx={{ width: "48%" }}
-                        />
+                
+                {/* Post Details Section */}
+                {postDetails && (
+                    <Box sx={{ mb: 3, p: 2, bgcolor: "grey.50", borderRadius: 2 }}>
+                        <Typography variant="h6" gutterBottom fontWeight="bold">
+                            📦 {postDetails.title}
+                        </Typography>
+                        <Typography variant="body1" sx={{ mb: 2, lineHeight: 1.6 }}>
+                            {postDetails.description}
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                            <Typography variant="body2">
+                                <strong>Quantity:</strong> {postDetails.quantity}
+                            </Typography>
+                            <Typography variant="body2">
+                                <strong>Category:</strong> {postDetails.category?.toUpperCase()}
+                            </Typography>
+                            <Typography variant="body2">
+                                <strong>Bids:</strong> {postDetails.bidsCount}
+                            </Typography>
+                            <Typography variant="body2">
+                                <strong>Reviews:</strong> {postDetails.reviewsCount}
+                            </Typography>
+                        </Box>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                            <strong>Address:</strong> {postDetails.user.address}
+                        </Typography>
+                        {/* Display coordinates if available */}
+                        {postDetails.user.latitude && postDetails.user.longitude && (
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                <strong>Coordinates:</strong> {postDetails.user.latitude.toFixed(6)}, {postDetails.user.longitude.toFixed(6)}
+                            </Typography>
+                        )}
                     </Box>
-                    <Box>
-                        <Button variant="contained" color="success">
-                            <HandshakeIcon sx={{ fontSize: 30 }} />
-                            Deal
+                )}
+
+                {/* Enhanced Map Section */}
+                <Box sx={{ mt: 10 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                        <Typography variant="h6" fontWeight="bold">
+                            📍 Location Map
+                        </Typography>
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            startIcon={<LaunchIcon />}
+                            onClick={openInGoogleMaps}
+                            size="small"
+                            sx={{ 
+                                textTransform: 'none',
+                                borderRadius: 2
+                            }}
+                        >
+                            Open in Google Maps
                         </Button>
                     </Box>
-                </Box>
-                <Box sx={{ mt: 10 }}>
+                    
+                    {/* Debug information */}
+                    <Box sx={{ mb: 2, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
+                        <Typography variant="caption" color="text.secondary" fontWeight="bold">
+                            Location Debug:
+                        </Typography>
+                        <Typography variant="caption" display="block" color="text.secondary">
+                            Lat: {postDetails?.user?.latitude || 'Not available'} (Type: {typeof postDetails?.user?.latitude})
+                        </Typography>
+                        <Typography variant="caption" display="block" color="text.secondary">
+                            Lng: {postDetails?.user?.longitude || 'Not available'} (Type: {typeof postDetails?.user?.longitude})
+                        </Typography>
+                        <Typography variant="caption" display="block" color="text.secondary">
+                            Address: {postDetails?.user?.address || 'Not available'}
+                        </Typography>
+                        <Typography variant="caption" display="block" color="text.secondary">
+                            City: {postDetails?.user?.city || 'Not available'}
+                        </Typography>
+                    </Box>
+                    
+                    {postDetails?.user?.latitude && postDetails?.user?.longitude ? (
+                        <Box sx={{ mb: 2 }}>
+                            <Typography variant="body2" color="success.main" sx={{ mb: 1 }}>
+                                ✅ Showing exact location: {postDetails.user.latitude.toFixed(6)}, {postDetails.user.longitude.toFixed(6)}
+                            </Typography>
+                        </Box>
+                    ) : (
+                        <Typography variant="body2" color="warning.main" sx={{ mb: 2 }}>
+                            ⚠️ Using address-based location
+                        </Typography>
+                    )}
+
                     <iframe
-                        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d990.2465151370129!2d79.88249354425925!3d6.89227016819514!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3ae25b724a9cdaef%3A0x88e1c79d7a3d95b7!2sFresh%20Flower%20Shop!5e0!3m2!1sen!2slk!4v1742661811121!5m2!1sen!2slk"
+                        src={getMapUrl()}
                         width="100%"
                         height="450"
-                        style={{ border: "1px solid black" }}
-                        allowFullScreen={true} // Fixed: Changed from string to boolean
+                        style={{ 
+                            border: "1px solid #ddd",
+                            borderRadius: "8px"
+                        }}
+                        allowFullScreen={true}
                         loading="lazy"
                         referrerPolicy="no-referrer-when-downgrade"
                     />
+                    
+                    {postDetails?.user?.address && (
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
+                            📍 {postDetails.user.address}
+                        </Typography>
+                    )}
                 </Box>
+
+                {/* Enhanced Bid Form */}
+                <Box sx={{ mt: 4, mb: 3 }}>
+                    <Typography variant="h6" gutterBottom fontWeight="bold" sx={{ mb: 3 }}>
+                        🤝 Place Your Bid
+                    </Typography>
+
+                    {/* Success Message */}
+                    {bidSuccess && (
+                        <Alert severity="success" sx={{ mb: 3 }}>
+                            {bidSuccess}
+                        </Alert>
+                    )}
+
+                    {/* Error Message */}
+                    {bidError && (
+                        <Alert severity="error" sx={{ mb: 3 }}>
+                            {bidError}
+                        </Alert>
+                    )}
+
+                    <Box
+                        component="form"
+                        sx={{
+                            display: "flex",
+                            flexDirection: "column",
+                            width: "100%",
+                            gap: 3,
+                        }}
+                        noValidate
+                        autoComplete="off"
+                    >
+                        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
+                            <TextField
+                                label="Price Per Unit (LKR)"
+                                type="number"
+                                variant="outlined"
+                                value={bidData.bitrate}
+                                onChange={(e) => handleBidInputChange('bitrate', e.target.value)}
+                                placeholder="Enter your price per unit"
+                                required
+                                disabled={isSubmittingBid}
+                                inputProps={{ min: 0, step: 0.01 }}
+                                sx={{ width: "48%" }}
+                                helperText="Enter the rate you're willing to pay/receive per unit"
+                            />
+                            
+                            <TextField
+                                label="Quantity Needed"
+                                type="number"
+                                variant="outlined"
+                                value={bidData.needamount}
+                                onChange={(e) => handleBidInputChange('needamount', e.target.value)}
+                                placeholder="Enter quantity"
+                                required
+                                disabled={isSubmittingBid}
+                                inputProps={{ min: 0, step: 0.01 }}
+                                sx={{ width: "48%" }}
+                                helperText="How much quantity do you need?"
+                            />
+                        </Box>
+
+                        <TextField
+                            label="Delivery Location"
+                            variant="outlined"
+                            value={bidData.deliverylocation}
+                            onChange={(e) => handleBidInputChange('deliverylocation', e.target.value)}
+                            placeholder="Enter preferred delivery location (optional)"
+                            disabled={isSubmittingBid}
+                            helperText="Where would you like the delivery? (Optional)"
+                            fullWidth
+                        />
+                        
+                        <TextField
+                            label="Contact Details & Special Notes"
+                            placeholder="Enter your contact number and any special requirements..."
+                            multiline
+                            rows={3}
+                            variant="outlined"
+                            value={bidData.bitdetailscol}
+                            onChange={(e) => handleBidInputChange('bitdetailscol', e.target.value)}
+                            required
+                            disabled={isSubmittingBid}
+                            helperText="Provide your contact details and any special instructions"
+                            fullWidth
+                        />
+
+                        <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 2 }}>
+                            <Button 
+                                variant="outlined" 
+                                onClick={() => {
+                                    setBidData({
+                                        bitrate: '',
+                                        needamount: '',
+                                        bitdetailscol: '',
+                                        deliverylocation: ''
+                                    });
+                                    setBidError('');
+                                    setBidSuccess('');
+                                }}
+                                disabled={isSubmittingBid}
+                                sx={{ minWidth: 100 }}
+                            >
+                                Clear
+                            </Button>
+                            
+                            <Button 
+                                variant="contained" 
+                                color="success"
+                                onClick={handleSubmitBid}
+                                disabled={isSubmittingBid}
+                                startIcon={<HandshakeIcon />}
+                                sx={{ minWidth: 150 }}
+                            >
+                                {isSubmittingBid ? 'Submitting...' : 'Submit Bid'}
+                            </Button>
+                        </Box>
+                    </Box>
+                </Box>
+
                 <Box sx={{ mt: 3, mb: 2 }}>
-                    <BitDealerListTable />
+                    <BitDealerListTable 
+                        postId={postDetails?.id} 
+                        bitDetails={postDetails?.bitDetails}
+                        key={refreshBids} // Force refresh when bids change
+                    />
                 </Box>
             </DialogContent>
             <DialogActions>
-                <Button onClick={handleClose}>Cancel</Button>
+                <Button 
+                    onClick={handleClose}
+                    disabled={isSubmittingBid}
+                >
+                    {isSubmittingBid ? 'Submitting...' : 'Cancel'}
+                </Button>
             </DialogActions>
         </Dialog>
     );

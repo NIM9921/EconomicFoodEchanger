@@ -23,6 +23,9 @@ import {
     useTheme,
     useMediaQuery,
     InputAdornment,
+    Autocomplete,
+    Tabs,
+    Tab,
 } from '@mui/material';
 import {
     Close as CloseIcon,
@@ -35,9 +38,14 @@ import {
     Category as CategoryIcon,
     Person as PersonIcon,
     Numbers as NumbersIcon,
+    LocationOn as LocationOnIcon,
+    MyLocation as MyLocationIcon,
+    Map as MapIcon,
+    PinDrop as PinDropIcon,
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import ApiConfig from '../../utils/ApiConfig';
+import MapLocationPicker from './MapLocationPicker';
 
 interface SharePostProps {
     open: boolean;
@@ -47,6 +55,13 @@ interface SharePostProps {
 interface CategoryStatus {
     id: number;
     status: string;
+}
+
+interface LocationData {
+    address: string;
+    city: string;
+    latitude?: number;
+    longitude?: number;
 }
 
 const VisuallyHiddenInput = styled('input')({
@@ -94,6 +109,19 @@ const PhotoCard = styled(Card)(({ theme }) => ({
     },
 }));
 
+// Sri Lankan cities for location selection
+const sriLankanCities = [
+    'Colombo', 'Kandy', 'Galle', 'Jaffna', 'Negombo', 'Anuradhapura', 'Polonnaruwa',
+    'Trincomalee', 'Batticaloa', 'Kurunegala', 'Ratnapura', 'Badulla', 'Matara',
+    'Vavuniya', 'Chilaw', 'Kalutara', 'Panadura', 'Gampaha', 'Kegalle', 'Nuwara Eliya',
+    'Hambantota', 'Monaragala', 'Puttalam', 'Ampara', 'Mannar', 'Kilinochchi',
+    'Mullaittivu', 'Matale', 'Bandarawela', 'Hatton', 'Dambulla', 'Sigiriya',
+    'Bentota', 'Hikkaduwa', 'Mirissa', 'Unawatuna', 'Ella', 'Tissamaharama',
+    'Kataragama', 'Avissawella', 'Horana', 'Wattala', 'Ja-Ela', 'Ragama',
+    'Kelaniya', 'Maharagama', 'Moratuwa', 'Mount Lavinia', 'Dehiwala',
+    'Kotte', 'Malabe', 'Kaduwela', 'Hanwella', 'Piliyandala'
+];
+
 export default function SharePostForm({ open, onClose }: SharePostProps) {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
@@ -102,9 +130,13 @@ export default function SharePostForm({ open, onClose }: SharePostProps) {
     const [previewUrls, setPreviewUrls] = useState<string[]>([]);
     const [userId, setUserId] = useState<number>(1);
     const [categoryStatus, setCategoryStatus] = useState<CategoryStatus | null>(null);
+    const [location, setLocation] = useState<LocationData>({ address: '', city: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [isGettingLocation, setIsGettingLocation] = useState(false);
+    const [locationTab, setLocationTab] = useState(0); // 0 for manual, 1 for map
+    const [mapOpen, setMapOpen] = useState(false);
 
     const theme = useTheme();
     const fullScreen = useMediaQuery(theme.breakpoints.down('md'));
@@ -124,6 +156,67 @@ export default function SharePostForm({ open, onClose }: SharePostProps) {
         '& .MuiInputLabel-root.Mui-focused': {
             color: 'primary.main',
         },
+    };
+
+    // Get current location using browser geolocation API
+    const getCurrentLocation = () => {
+        setIsGettingLocation(true);
+        
+        if (!navigator.geolocation) {
+            setError('Geolocation is not supported by this browser.');
+            setIsGettingLocation(false);
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                const { latitude, longitude } = position.coords;
+                
+                try {
+                    // Reverse geocoding to get address (using a free service)
+                    const response = await fetch(
+                        `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
+                    );
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        setLocation({
+                            address: data.locality || data.city || 'Current Location',
+                            city: data.city || data.locality || '',
+                            latitude,
+                            longitude
+                        });
+                    } else {
+                        setLocation({
+                            address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+                            city: '',
+                            latitude,
+                            longitude
+                        });
+                    }
+                } catch (err) {
+                    console.error('Reverse geocoding failed:', err);
+                    setLocation({
+                        address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+                        city: '',
+                        latitude,
+                        longitude
+                    });
+                }
+                
+                setIsGettingLocation(false);
+            },
+            (error) => {
+                console.error('Geolocation error:', error);
+                setError('Unable to get your location. Please enter manually.');
+                setIsGettingLocation(false);
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 300000 // 5 minutes
+            }
+        );
     };
 
     const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -197,6 +290,11 @@ export default function SharePostForm({ open, onClose }: SharePostProps) {
             return false;
         }
 
+        if (!location.address.trim()) {
+            setError('Location address is required.');
+            return false;
+        }
+
         if (selectedFiles.length === 0) {
             setError('Please select at least one image.');
             return false;
@@ -219,6 +317,16 @@ export default function SharePostForm({ open, onClose }: SharePostProps) {
             formData.append('description', description);
             formData.append('quantity', quantity.toString());
             formData.append('userId', userId.toString());
+            
+            // Add location data
+            formData.append('address', location.address);
+            formData.append('city', location.city);
+            if (location.latitude !== undefined) {
+                formData.append('latitude', location.latitude.toString());
+            }
+            if (location.longitude !== undefined) {
+                formData.append('longitude', location.longitude.toString());
+            }
 
             // Add files
             selectedFiles.forEach(file => {
@@ -239,11 +347,12 @@ export default function SharePostForm({ open, onClose }: SharePostProps) {
                 description,
                 quantity,
                 userId,
+                location,
                 categoryStatus,
                 filesCount: selectedFiles.length
             });
 
-            const response = await fetch(ApiConfig.Domain+'/sharedpost/upload-media', {
+            const response = await fetch(ApiConfig.Domain + '/sharedpost/upload-media', {
                 method: 'POST',
                 body: formData,
             });
@@ -279,17 +388,31 @@ export default function SharePostForm({ open, onClose }: SharePostProps) {
         setSelectedFiles([]);
         setPreviewUrls([]);
         setCategoryStatus(null);
+        setLocation({ address: '', city: '' });
         setError('');
         setSuccess('');
         setIsSubmitting(false);
         onClose();
     };
 
+    // Handle location selection from map
+    const handleLocationFromMap = (locationData: LocationData) => {
+        setLocation(locationData);
+        setMapOpen(false);
+    };
+
+    const handleLocationTabChange = (event: React.SyntheticEvent, newValue: number) => {
+        setLocationTab(newValue);
+        if (newValue === 1) {
+            setMapOpen(true);
+        }
+    };
+
     return (
         <Dialog
             open={open}
             onClose={!isSubmitting ? handleClose : undefined}
-            maxWidth="md"
+            maxWidth="lg" // Changed to lg for better map display
             fullWidth
             fullScreen={fullScreen}
             PaperProps={{
@@ -469,6 +592,175 @@ export default function SharePostForm({ open, onClose }: SharePostProps) {
                                 </Select>
                             </FormControl>
                         </Grid>
+
+                        {/* Location Section */}
+                        <Grid item xs={12}>
+                            <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold', mt: 2, mb: 2 }}>
+                                Location Information
+                            </Typography>
+                            
+                            {/* Location Selection Tabs */}
+                            <Tabs
+                                value={locationTab}
+                                onChange={handleLocationTabChange}
+                                sx={{ 
+                                    mb: 3,
+                                    '& .MuiTab-root': {
+                                        textTransform: 'none',
+                                        fontWeight: 'medium'
+                                    }
+                                }}
+                            >
+                                <Tab 
+                                    icon={<LocationOnIcon />} 
+                                    label="Manual Entry" 
+                                    iconPosition="start"
+                                    disabled={isSubmitting}
+                                />
+                                <Tab 
+                                    icon={<MapIcon />} 
+                                    label="Pick from Map" 
+                                    iconPosition="start"
+                                    disabled={isSubmitting}
+                                />
+                            </Tabs>
+                        </Grid>
+
+                        {/* Manual Location Entry */}
+                        {locationTab === 0 && (
+                            <>
+                                <Grid item xs={12} sm={8}>
+                                    <TextField
+                                        fullWidth
+                                        label="Address / Location Description"
+                                        variant="outlined"
+                                        value={location.address}
+                                        onChange={(e) => setLocation(prev => ({ ...prev, address: e.target.value }))}
+                                        placeholder="Enter specific address or location description..."
+                                        required
+                                        disabled={isSubmitting}
+                                        multiline
+                                        rows={2}
+                                        InputProps={{
+                                            startAdornment: (
+                                                <InputAdornment position="start">
+                                                    <LocationOnIcon sx={{ color: 'primary.main', mt: 1 }} />
+                                                </InputAdornment>
+                                            ),
+                                        }}
+                                        sx={inputStyle}
+                                    />
+                                </Grid>
+
+                                <Grid item xs={12} sm={4}>
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, height: '100%' }}>
+                                        <Autocomplete
+                                            options={sriLankanCities}
+                                            value={location.city}
+                                            onChange={(event, newValue) => {
+                                                setLocation(prev => ({ ...prev, city: newValue || '' }));
+                                            }}
+                                            renderInput={(params) => (
+                                                <TextField
+                                                    {...params}
+                                                    label="City"
+                                                    variant="outlined"
+                                                    disabled={isSubmitting}
+                                                    sx={inputStyle}
+                                                    placeholder="Select or type city..."
+                                                />
+                                            )}
+                                            freeSolo
+                                            disabled={isSubmitting}
+                                        />
+                                        
+                                        <Button
+                                            variant="outlined"
+                                            onClick={getCurrentLocation}
+                                            disabled={isSubmitting || isGettingLocation}
+                                            startIcon={<MyLocationIcon />}
+                                            sx={{ 
+                                                textTransform: 'none',
+                                                borderRadius: 2,
+                                                py: 1
+                                            }}
+                                        >
+                                            {isGettingLocation ? 'Getting Location...' : 'Use Current Location'}
+                                        </Button>
+                                    </Box>
+                                </Grid>
+                            </>
+                        )}
+
+                        {/* Map Location Display */}
+                        {locationTab === 1 && (
+                            <Grid item xs={12}>
+                                <Box sx={{ 
+                                    p: 3, 
+                                    border: '1px dashed',
+                                    borderColor: 'primary.main',
+                                    borderRadius: 2,
+                                    bgcolor: 'rgba(25, 118, 210, 0.04)',
+                                    textAlign: 'center'
+                                }}>
+                                    <PinDropIcon sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
+                                    <Typography variant="h6" color="primary" gutterBottom>
+                                        Select Location on Map
+                                    </Typography>
+                                    
+                                    {location.address ? (
+                                        <Box sx={{ mt: 2 }}>
+                                            <Typography variant="body1" fontWeight="medium" gutterBottom>
+                                                Selected Location:
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                                📍 {location.address}
+                                            </Typography>
+                                            {location.city && (
+                                                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                                    🏙️ {location.city}
+                                                </Typography>
+                                            )}
+                                            {location.latitude && location.longitude && (
+                                                <Typography variant="caption" color="text.secondary">
+                                                    Coordinates: {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
+                                                </Typography>
+                                            )}
+                                        </Box>
+                                    ) : (
+                                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                            Click the button below to open the map and pin your location
+                                        </Typography>
+                                    )}
+                                    
+                                    <Button
+                                        variant="contained"
+                                        onClick={() => setMapOpen(true)}
+                                        disabled={isSubmitting}
+                                        startIcon={<MapIcon />}
+                                        sx={{ 
+                                            mt: 2,
+                                            textTransform: 'none',
+                                            borderRadius: 2,
+                                            px: 4
+                                        }}
+                                    >
+                                        {location.address ? 'Change Location' : 'Open Map'}
+                                    </Button>
+                                </Box>
+                            </Grid>
+                        )}
+
+                        {/* Show coordinates if available */}
+                        {location.latitude && location.longitude && locationTab === 0 && (
+                            <Grid item xs={12}>
+                                <Alert severity="info" sx={{ mt: 1 }}>
+                                    <Typography variant="body2">
+                                        📍 Coordinates: {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
+                                    </Typography>
+                                </Alert>
+                            </Grid>
+                        )}
                     </Grid>
 
                     {/* Photo Upload Section */}
@@ -611,6 +903,14 @@ export default function SharePostForm({ open, onClose }: SharePostProps) {
                     {isSubmitting ? 'Uploading...' : 'Share Post'}
                 </Button>
             </DialogActions>
+
+            {/* Map Location Picker Modal */}
+            <MapLocationPicker
+                open={mapOpen}
+                onClose={() => setMapOpen(false)}
+                onLocationSelect={handleLocationFromMap}
+                initialLocation={location}
+            />
         </Dialog>
     );
 }

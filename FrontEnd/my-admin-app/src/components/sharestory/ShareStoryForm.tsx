@@ -21,6 +21,7 @@ import {
     Close,
     Image as ImageIcon
 } from '@mui/icons-material';
+import ApiConfig from '../../utils/ApiConfig';
 
 interface SharePostFormProps {
     open: boolean;

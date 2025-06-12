@@ -270,6 +270,48 @@ export default function Home() {
 
             const data: SharedPostData[] = await response.json();
             console.log('Fetched shared posts data:', data);
+            
+            // Enhanced Debug: Check coordinates and bitDetails in the data
+            data.forEach((post, index) => {
+                console.log(`Post ${index + 1} complete data:`, {
+                    id: post.id,
+                    title: post.title,
+                    coordinates: {
+                        postLatitude: post.latitude,
+                        postLongitude: post.longitude,
+                        postLatType: typeof post.latitude,
+                        postLngType: typeof post.longitude,
+                    },
+                    user: {
+                        userLatitude: post.username?.latitude,
+                        userLongitude: post.username?.longitude,
+                        userAddress: post.username?.address,
+                        userCity: post.username?.city,
+                    },
+                    bitDetails: {
+                        count: post.bitDetails?.length || 0,
+                        details: post.bitDetails?.map(bid => ({
+                            id: bid.id,
+                            bidder: bid.user?.name,
+                            amount: bid.bitrate,
+                            quantity: bid.needamount,
+                            contact: bid.bitdetailscol,
+                            location: bid.deliverylocation,
+                            confirmed: bid.conformedstate
+                        })) || []
+                    },
+                    reviews: {
+                        count: post.reviews?.length || 0
+                    }
+                });
+
+                // Convert and log the coordinates
+                if (post.latitude && post.longitude) {
+                    const lat = parseFloat(post.latitude);
+                    const lng = parseFloat(post.longitude);
+                    console.log(`Post ${index + 1} converted coordinates:`, { lat, lng });
+                }
+            });
 
             setSharedPosts(data || []);
         } catch (err) {
@@ -336,6 +378,12 @@ export default function Home() {
         // Load community posts by default
         fetchSharedPosts();
     }, []);
+
+    // Function to refresh shared posts data
+    const refreshSharedPosts = async () => {
+        console.log('Refreshing shared posts data...');
+        await fetchSharedPosts();
+    };
 
     // Loading skeleton for posts
     const PostSkeleton = () => (
@@ -600,7 +648,11 @@ export default function Home() {
                             {!postsLoading && sharedPosts.length > 0 && (
                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                                     {sharedPosts.map((post) => (
-                                        <VegitablePost key={post.id} post={post} />
+                                        <VegitablePost 
+                                            key={`${post.id}-${Date.now()}`}
+                                            post={post} 
+                                            onBidSubmitted={refreshSharedPosts}
+                                        />
                                     ))}
                                 </Box>
                             )}

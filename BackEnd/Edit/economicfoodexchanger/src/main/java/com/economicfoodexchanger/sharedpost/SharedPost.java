@@ -28,6 +28,12 @@ public class SharedPost {
     @Column(name = "discription")
     private String discription;
 
+    @Column(name = "longitude")
+    private String longitude;
+
+    @Column(name = "latitude")
+    private String latitude;
+
     @Column(name = "quentity")
     private String quentity;
 
