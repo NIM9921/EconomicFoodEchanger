@@ -15,27 +15,36 @@ import {
     List,
     ListItem,
     ListItemText,
-    ListItemIcon
+    ListItemIcon,
+    CircularProgress,
+    Alert
 } from '@mui/material';
 import {
     ShoppingCart as ShoppingCartIcon,
     Storefront as StorefrontIcon,
     TrendingUp as TrendingUpIcon,
-    // Remove unused import
     Notifications as NotificationsIcon,
     AttachMoney as AttachMoneyIcon,
     UploadFile as UploadFileIcon
 } from '@mui/icons-material';
 import { Link } from 'react-router-dom';
+import ApiConfig from '../utils/ApiConfig';
 
+// Define interface for user report data
+interface UserReportData {
+    shared_buying_post_count: string;
+    total_cost: string;
+    total_profit: string;
+    shared_selling_post_count: string;
+}
 
-// Define interface for market summary
-interface MarketSummary {
-    totalSellingItems: number;
-    totalBuyingItems: number;
+// Define interface for dashboard summary
+interface DashboardSummary {
+    totalSellingPosts: number;
+    totalBuyingPosts: number;
+    totalProfit: number;
+    totalCost: number;
     notificationCount: number;
-    sellingProfit: number;
-    buyingCost: number,
 }
 
 const StyledPaper = styled(Paper)(({ }) => ({
@@ -49,40 +58,107 @@ const StyledCard = styled(Card)(({ }) => ({
     flexDirection: 'column'
 }));
 
-const SummaryCard = ({ title, value, icon, color }: { title: string, value: string, icon: React.ReactNode, color: string }) => (
-    <Card sx={{ bgcolor: color, color: 'white' }}>
+const SummaryCard = ({ title, value, icon, color, isLoading }: { 
+    title: string, 
+    value: string, 
+    icon: React.ReactNode, 
+    color: string,
+    isLoading?: boolean 
+}) => (
+    <Card sx={{ bgcolor: color, color: 'white', minHeight: 120 }}>
         <CardContent>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Box>
-                    <Typography variant="overline">{title}</Typography>
-                    <Typography variant="h4" fontWeight="bold">{value}</Typography>
+                    <Typography variant="overline" sx={{ opacity: 0.8 }}>
+                        {title}
+                    </Typography>
+                    {isLoading ? (
+                        <CircularProgress size={24} sx={{ color: 'white', mt: 1 }} />
+                    ) : (
+                        <Typography variant="h4" fontWeight="bold">
+                            {value}
+                        </Typography>
+                    )}
                 </Box>
-                <Box>{icon}</Box>
+                <Box sx={{ opacity: 0.8 }}>
+                    {icon}
+                </Box>
             </Box>
         </CardContent>
     </Card>
 );
 
 export default function Dashboard() {
-    const [summary, setSummary] = useState<MarketSummary>({
-        totalSellingItems: 10,
-        totalBuyingItems: 10,
-        sellingProfit: 10,
-        buyingCost: 10,
-        notificationCount: 10,
+    const [userReport, setUserReport] = useState<UserReportData | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary>({
+        totalSellingPosts: 0,
+        totalBuyingPosts: 0,
+        totalProfit: 0,
+        totalCost: 0,
+        notificationCount: 5, // Static for now
     });
 
-    // Sample JSON for selling item deals - ensuring it's correctly defined
+    // Fetch user report data from API
+    const fetchUserReport = async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
+            
+            console.log('Fetching user report from:', `${ApiConfig.Domain}/userreport`);
+            
+            const response = await fetch(`${ApiConfig.Domain}/userreport`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data: UserReportData = await response.json();
+            console.log('User report data received:', data);
+            
+            setUserReport(data);
+            
+            // Update dashboard summary with API data
+            setDashboardSummary({
+                totalSellingPosts: parseInt(data.shared_selling_post_count) || 0,
+                totalBuyingPosts: parseInt(data.shared_buying_post_count) || 0,
+                totalProfit: parseFloat(data.total_profit) || 0,
+                totalCost: parseFloat(data.total_cost) || 0,
+                notificationCount: 5, // Static for now
+            });
+            
+        } catch (err) {
+            console.error('Error fetching user report:', err);
+            setError(err instanceof Error ? err.message : 'Failed to fetch user report');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Fetch data on component mount
+    useEffect(() => {
+        fetchUserReport();
+    }, []);
+
+    // Format currency values
+    const formatCurrency = (value: number): string => {
+        return new Intl.NumberFormat('en-LK', {
+            style: 'currency',
+            currency: 'LKR',
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }).format(value).replace('LKR', 'Rs');
+    };
+
+    // Sample JSON for selling item deals
     const sellingItems = [
         { id: 1, name: 'Tomatoes', category: 'Vegetables' },
         { id: 2, name: 'Carrots', category: 'Vegetables' },
-        { id: 2, name: 'Mango', category: 'Fruit' }
+        { id: 3, name: 'Mango', category: 'Fruit' }
     ];
 
-    // Debug log to verify data
-    console.log('Selling Items:', sellingItems);
-
-    // Mock data - replace with actual data from your CSV JSON
+    // Mock data for recent items
     const recentItems = [
         { id: 1, name: 'Tomatoes', price: -2.50, category: 'Vegetables' },
         { id: 2, name: 'Red Snapper', price: 12.75, category: 'Fish' },
@@ -90,99 +166,156 @@ export default function Dashboard() {
         { id: 4, name: 'Tuna', price: 15.40, category: 'Fish' }
     ];
 
-    const specialNotes = [
-        { category: 'Vegetables', note: 'Fresh tomato supplies limited due to recent weather conditions.' },
-        { category: 'Fish', note: 'High quality tuna available this week. Special discount on bulk orders.' }
-    ];
-
-    // Calculate summary from localStorage or other data source
-    useEffect(() => {
-        // Try to get market data from localStorage
-        try {
-            const storedData = localStorage.getItem('marketData');
-            if (storedData) {
-                const marketData = JSON.parse(storedData);
-
-                // Extract summary information - fixed type issues
-                const newSummary: Partial<MarketSummary> = {
-                    totalSellingItems: marketData.items?.length || 0,
-                    totalBuyingItems: new Set(marketData.items?.map((item: {category: string}) => item.category)).size || 0,
-                    latestUpdate: marketData.metadata?.dateProcessed ?
-                        Date.parse(marketData.metadata.dateProcessed) : Date.now(),
-                    sellingProfit: Math.floor(Math.random() * 20) // Replace with actual data
-                };
-
-                setSummary(prev => ({...prev, ...newSummary}));
-            }
-        } catch (error) {
-            console.error("Error loading dashboard data:", error);
-        }
-    }, []);
-
     return (
         <Box sx={{ p: 3 }}>
-            <Typography variant="h4" component="h1" sx={{ mb: 4, fontWeight: 'bold' }}>
-                User Market Dashboard
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+                <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
+                    📊 User Market Dashboard
+                </Typography>
+                <Button
+                    variant="outlined"
+                    onClick={fetchUserReport}
+                    disabled={isLoading}
+                    startIcon={isLoading ? <CircularProgress size={16} /> : undefined}
+                    sx={{ textTransform: 'none' }}
+                >
+                    {isLoading ? 'Refreshing...' : 'Refresh Data'}
+                </Button>
+            </Box>
+
+            {/* Error Alert */}
+            {error && (
+                <Alert 
+                    severity="error" 
+                    sx={{ mb: 3 }}
+                    action={
+                        <Button color="inherit" size="small" onClick={fetchUserReport}>
+                            Retry
+                        </Button>
+                    }
+                >
+                    Error loading dashboard data: {error}
+                </Alert>
+            )}
 
             {/* Summary Cards */}
             <Grid container spacing={3} sx={{ mb: 3 }}>
                 <Grid item xs={12} sm={6} md={3}>
                     <SummaryCard
-                        title="Total Selling Item"
-                        value={summary.totalSellingItems.toString()}
+                        title="🛒 Selling Posts"
+                        value={dashboardSummary.totalSellingPosts.toString()}
                         icon={<StorefrontIcon fontSize="large" />}
                         color="#4caf50"
+                        isLoading={isLoading}
                     />
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
                     <SummaryCard
-                        title="Total Buying Item"
-                        value={summary.totalBuyingItems.toString()}
+                        title="🛍️ Buying Posts"
+                        value={dashboardSummary.totalBuyingPosts.toString()}
                         icon={<ShoppingCartIcon fontSize="large" />}
                         color="#2196f3"
+                        isLoading={isLoading}
                     />
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
                     <SummaryCard
-                        title="Selling Profit"
-                        value={`Rs ${summary.buyingCost.toString()}`}
-                        icon={<AttachMoneyIcon fontSize="large" />}
+                        title="💰 Total Profit"
+                        value={isLoading ? '...' : formatCurrency(dashboardSummary.totalProfit)}
+                        icon={<TrendingUpIcon fontSize="large" />}
                         color="#ff9800"
+                        isLoading={isLoading}
                     />
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
                     <SummaryCard
-                        title="Buying Cost"
-                        value={`Rs ${summary.buyingCost.toString()}`}
+                        title="💸 Total Cost"
+                        value={isLoading ? '...' : formatCurrency(dashboardSummary.totalCost)}
                         icon={<AttachMoneyIcon fontSize="large" />}
                         color="#f44336"
+                        isLoading={isLoading}
                     />
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
                     <SummaryCard
-                        title="Notification"
-                        value={summary.notificationCount.toString()}
+                        title="🔔 Notifications"
+                        value={dashboardSummary.notificationCount.toString()}
                         icon={
                             <Badge
                                 color="error"
                                 variant="dot"
-                                invisible={summary.notificationCount === 0}
+                                invisible={dashboardSummary.notificationCount === 0}
                             >
                                 <NotificationsIcon fontSize="large" />
                             </Badge>
                         }
                         color="#5499c7"
+                        isLoading={false}
                     />
                 </Grid>
             </Grid>
+
+            {/* API Data Display Section */}
+            {userReport && !isLoading && (
+                <Grid container spacing={3} sx={{ mb: 3 }}>
+                    <Grid item xs={12}>
+                        <Paper sx={{ p: 3, bgcolor: 'linear-gradient(135deg, #e8f5e8 0%, #c8e6c8 100%)' }}>
+                            <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: 'success.main' }}>
+                                📈 Latest Report Summary
+                            </Typography>
+                            <Grid container spacing={2}>
+                                <Grid item xs={6} sm={3}>
+                                    <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'white', borderRadius: 2 }}>
+                                        <Typography variant="h4" color="success.main" fontWeight="bold">
+                                            {userReport.shared_selling_post_count}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            Selling Posts
+                                        </Typography>
+                                    </Box>
+                                </Grid>
+                                <Grid item xs={6} sm={3}>
+                                    <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'white', borderRadius: 2 }}>
+                                        <Typography variant="h4" color="primary.main" fontWeight="bold">
+                                            {userReport.shared_buying_post_count}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            Buying Posts
+                                        </Typography>
+                                    </Box>
+                                </Grid>
+                                <Grid item xs={6} sm={3}>
+                                    <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'white', borderRadius: 2 }}>
+                                        <Typography variant="h4" color="warning.main" fontWeight="bold">
+                                            {formatCurrency(parseFloat(userReport.total_profit))}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            Total Profit
+                                        </Typography>
+                                    </Box>
+                                </Grid>
+                                <Grid item xs={6} sm={3}>
+                                    <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'white', borderRadius: 2 }}>
+                                        <Typography variant="h4" color="error.main" fontWeight="bold">
+                                            {formatCurrency(parseFloat(userReport.total_cost))}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            Total Cost
+                                        </Typography>
+                                    </Box>
+                                </Grid>
+                            </Grid>
+                        </Paper>
+                    </Grid>
+                </Grid>
+            )}
 
             {/* Main Dashboard Content */}
             <Grid container spacing={3}>
                 {/* Quick Actions */}
                 <Grid item xs={12} md={4}>
                     <StyledCard>
-                        <CardHeader title="Quick Actions" />
+                        <CardHeader title="🚀 Quick Actions" />
                         <Divider />
                         <CardContent sx={{ flexGrow: 1 }}>
                             <Grid container spacing={2}>
@@ -194,29 +327,45 @@ export default function Dashboard() {
                                         color="success"
                                         startIcon={<UploadFileIcon />}
                                         fullWidth
+                                        sx={{ textTransform: 'none' }}
                                     >
                                         Upload CSV
                                     </Button>
                                 </Grid>
                                 <Grid item xs={6}>
-                                    <Button variant="outlined" fullWidth>
+                                    <Button 
+                                        variant="outlined" 
+                                        fullWidth
+                                        sx={{ textTransform: 'none' }}
+                                    >
                                         Generate Report
                                     </Button>
                                 </Grid>
                                 <Grid item xs={6}>
-                                    <Button variant="outlined" fullWidth>
+                                    <Button 
+                                        variant="outlined" 
+                                        fullWidth
+                                        sx={{ textTransform: 'none' }}
+                                    >
                                         Price Analysis
                                     </Button>
                                 </Grid>
                                 <Grid item xs={6}>
-                                    <Button variant="outlined" fullWidth>
-                                        Settings
+                                    <Button 
+                                        variant="outlined" 
+                                        fullWidth
+                                        sx={{ textTransform: 'none' }}
+                                        onClick={fetchUserReport}
+                                        disabled={isLoading}
+                                    >
+                                        {isLoading ? 'Loading...' : 'Refresh'}
                                     </Button>
                                 </Grid>
                             </Grid>
-                            <Box mt={2}>
+                            
+                            <Box mt={3}>
                                 <StyledCard>
-                                    <CardHeader title="Selling Item Deals" />
+                                    <CardHeader title="🛒 Selling Item Deals" />
                                     <Divider />
                                     <CardContent>
                                         {sellingItems && sellingItems.length > 0 ? (
@@ -225,19 +374,29 @@ export default function Dashboard() {
                                                     key={item.id}
                                                     sx={{
                                                         mb: 1,
-                                                        p: 1,
+                                                        p: 2,
                                                         border: '1px solid #e0e0e0',
-                                                        borderRadius: 1,
-                                                        bgcolor: '#f5f5f5'
+                                                        borderRadius: 2,
+                                                        bgcolor: '#f5f5f5',
+                                                        transition: 'all 0.2s ease',
+                                                        '&:hover': {
+                                                            bgcolor: '#e8f5e8',
+                                                            borderColor: '#4caf50'
+                                                        }
                                                     }}
                                                 >
                                                     <Typography variant="body1" fontWeight="medium">
-                                                        {item.name} - <span style={{ color: '#4caf50' }}>{item.category}</span>
+                                                        {item.name}
+                                                    </Typography>
+                                                    <Typography variant="body2" color="success.main">
+                                                        📦 {item.category}
                                                     </Typography>
                                                 </Box>
                                             ))
                                         ) : (
-                                            <Typography variant="body2">No items to display</Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                No items to display
+                                            </Typography>
                                         )}
                                     </CardContent>
                                 </StyledCard>
@@ -249,7 +408,7 @@ export default function Dashboard() {
                 {/* Recent Updates */}
                 <Grid item xs={12} md={8}>
                     <StyledCard>
-                        <CardHeader title="Recent Price Updates" />
+                        <CardHeader title="📈 Recent Price Updates" />
                         <Divider />
                         <List sx={{ flexGrow: 1 }}>
                             {recentItems.map(item => (
@@ -262,47 +421,25 @@ export default function Dashboard() {
                                         )}
                                     </ListItemIcon>
                                     <ListItemText
-                                        primary={`${item.name} - Rs ${item.price.toFixed(2)}`}
-                                        secondary={item.category}
+                                        primary={`${item.name} - Rs ${Math.abs(item.price).toFixed(2)}`}
+                                        secondary={`📦 ${item.category} • ${item.price > 0 ? 'Price Increased' : 'Price Decreased'}`}
                                     />
                                 </ListItem>
                             ))}
                         </List>
-                        <Box sx={{ p: 1 }}>
+                        <Box sx={{ p: 2 }}>
                             <Button
                                 component={Link}
                                 to="/reports"
                                 size="small"
                                 color="primary"
+                                sx={{ textTransform: 'none' }}
                             >
-                                View All Items
+                                📊 View All Items
                             </Button>
                         </Box>
                     </StyledCard>
                 </Grid>
-
-                {/* Special Notes */}
-                {/*<Grid item xs={12}>
-                    <StyledPaper elevation={2}>
-                        <Typography variant="h6" sx={{ mb: 2 }}>Special Market Notes</Typography>
-                        <Grid container spacing={2}>
-                            {specialNotes.map((note, index) => (
-                                <Grid item xs={12} sm={6} md={4} key={index}>
-                                    <Card variant="outlined">
-                                        <CardContent>
-                                            <Typography color="primary" fontWeight="bold" gutterBottom>
-                                                {note.category}
-                                            </Typography>
-                                            <Typography variant="body2">
-                                                {note.note}
-                                            </Typography>
-                                        </CardContent>
-                                    </Card>
-                                </Grid>
-                            ))}
-                        </Grid>
-                    </StyledPaper>
-                </Grid>*/}
             </Grid>
         </Box>
     );
