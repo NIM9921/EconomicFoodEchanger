@@ -180,6 +180,15 @@ export default function ScrollDialog({
         setBidSubmittedFlag(false);
     };
 
+    // Add the missing handleDialogClose function
+    const handleDialogClose = () => {
+        if (isSubmittingBid) {
+            // Prevent closing during bid submission
+            return;
+        }
+        handleClose();
+    };
+
     const handleNext = () => {
         setActiveStep((prevActiveStep) => prevActiveStep + 1);
     };
