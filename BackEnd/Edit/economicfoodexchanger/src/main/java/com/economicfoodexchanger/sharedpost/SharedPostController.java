@@ -1,5 +1,6 @@
 package com.economicfoodexchanger.sharedpost;
 
+import com.economicfoodexchanger.User;
 import com.economicfoodexchanger.UserDao;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -268,5 +269,13 @@ public class SharedPostController {
             public String getUrl() { return url; }
             public void setUrl(String url) { this.url = url; }
         }
+    }
+
+    public List<SharedPost> getUserSharedPost(User UserId){
+
+        System.out.println("UserId = " + UserId.getUsername());
+        List<SharedPost> sharedPostList = sharedPostDao.getAllByUsername(UserId);
+        System.out.println(UserId.getId());
+        return sharedPostList;
     }
 }

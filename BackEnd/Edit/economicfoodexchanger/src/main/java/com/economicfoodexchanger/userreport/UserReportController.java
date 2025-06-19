@@ -1,14 +1,19 @@
 package com.economicfoodexchanger.userreport;
 
 
+import com.economicfoodexchanger.User;
 import com.economicfoodexchanger.UserDao;
+import com.economicfoodexchanger.sharedpost.SharedPostController;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/userreport")
@@ -16,6 +21,9 @@ public class UserReportController {
 
     @Autowired
     UserDao userDao;
+
+    @Autowired
+    SharedPostController sharedPostController;
 
     //http://localhost:8080/userreport
     @GetMapping
@@ -41,4 +49,17 @@ public class UserReportController {
         return userReport;
     }
 
+    @GetMapping("/sharedpostComparsion")
+    public LinkedHashSet<String> shredPostComparisonDetails(){
+        Optional<User> user = userDao.findById(1);
+
+        LinkedHashSet<String> uniqueTitles = new LinkedHashSet<>();
+        if (user.isPresent()) {
+            sharedPostController.getUserSharedPost(user.get()).forEach(sharedPost -> {
+                uniqueTitles.add(sharedPost.getTitle());
+            });
+        }
+
+        return  uniqueTitles;
+    }
 }
