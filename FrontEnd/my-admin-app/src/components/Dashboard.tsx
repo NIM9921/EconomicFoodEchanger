@@ -17,7 +17,9 @@ import {
     ListItemText,
     ListItemIcon,
     CircularProgress,
-    Alert
+    Alert,
+    useTheme,
+    useMediaQuery
 } from '@mui/material';
 import {
     ShoppingCart as ShoppingCartIcon,
@@ -36,6 +38,14 @@ interface UserReportData {
     total_cost: string;
     total_profit: string;
     shared_selling_post_count: string;
+}
+
+// Define interface for recent items from API
+interface RecentItem {
+    id: number;
+    name: string;
+    priceChanges: number; // Changed from price to priceChanges
+    category: string;
 }
 
 // Define interface for dashboard summary
@@ -64,29 +74,68 @@ const SummaryCard = ({ title, value, icon, color, isLoading }: {
     icon: React.ReactNode, 
     color: string,
     isLoading?: boolean 
-}) => (
-    <Card sx={{ bgcolor: color, color: 'white', minHeight: 120 }}>
-        <CardContent>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Box>
-                    <Typography variant="overline" sx={{ opacity: 0.8 }}>
-                        {title}
-                    </Typography>
-                    {isLoading ? (
-                        <CircularProgress size={24} sx={{ color: 'white', mt: 1 }} />
-                    ) : (
-                        <Typography variant="h4" fontWeight="bold">
-                            {value}
+}) => {
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+    
+    return (
+        <Card sx={{ 
+            bgcolor: color, 
+            color: 'white', 
+            minHeight: isMobile ? 100 : 120,
+            boxShadow: 3,
+            borderRadius: 2
+        }}>
+            <CardContent sx={{ p: isMobile ? 2 : 3 }}>
+                <Box sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    flexDirection: isMobile ? 'column' : 'row',
+                    textAlign: isMobile ? 'center' : 'left'
+                }}>
+                    <Box sx={{ flex: 1 }}>
+                        <Typography 
+                            variant={isMobile ? "caption" : "overline"} 
+                            sx={{ 
+                                opacity: 0.8,
+                                fontSize: isMobile ? '0.7rem' : '0.75rem',
+                                display: 'block',
+                                mb: 0.5
+                            }}
+                        >
+                            {title}
                         </Typography>
-                    )}
+                        {isLoading ? (
+                            <CircularProgress size={isMobile ? 20 : 24} sx={{ color: 'white', mt: 1 }} />
+                        ) : (
+                            <Typography 
+                                variant={isMobile ? "h6" : "h4"} 
+                                fontWeight="bold"
+                                sx={{ 
+                                    fontSize: isMobile ? '1.1rem' : '2.125rem',
+                                    lineHeight: isMobile ? 1.2 : 1,
+                                    wordBreak: 'break-word'
+                                }}
+                            >
+                                {value}
+                            </Typography>
+                        )}
+                    </Box>
+                    <Box sx={{ 
+                        opacity: 0.8,
+                        mt: isMobile ? 1 : 0,
+                        ml: isMobile ? 0 : 2
+                    }}>
+                        {React.cloneElement(icon as React.ReactElement, {
+                            fontSize: isMobile ? 'medium' : 'large'
+                        })}
+                    </Box>
                 </Box>
-                <Box sx={{ opacity: 0.8 }}>
-                    {icon}
-                </Box>
-            </Box>
-        </CardContent>
-    </Card>
-);
+            </CardContent>
+        </Card>
+    );
+};
 
 export default function Dashboard() {
     const [userReport, setUserReport] = useState<UserReportData | null>(null);
@@ -99,6 +148,16 @@ export default function Dashboard() {
         totalCost: 0,
         notificationCount: 5, // Static for now
     });
+
+    // Add state for recent items
+    const [recentItems, setRecentItems] = useState<RecentItem[]>([]);
+    const [sellingItems, setSellingItems] = useState<RecentItem[]>([]);
+    const [isLoadingItems, setIsLoadingItems] = useState(false);
+    const [itemsError, setItemsError] = useState<string | null>(null);
+
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+    const isTablet = useMediaQuery(theme.breakpoints.down('md'));
 
     // Fetch user report data from API
     const fetchUserReport = async () => {
@@ -136,9 +195,70 @@ export default function Dashboard() {
         }
     };
 
+    // Fetch recent items data from API
+    const fetchRecentItems = async () => {
+        try {
+            setIsLoadingItems(true);
+            setItemsError(null);
+            
+            console.log('Fetching recent items from:', `${ApiConfig.Domain}/userreport/recent-items`);
+            
+            const response = await fetch(`${ApiConfig.Domain}/userreport/recent-items`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data: RecentItem[] = await response.json();
+            console.log('Recent items data received:', data);
+            
+            setRecentItems(data);
+            
+            // Filter items by category for selling deals
+            // Get unique items from different categories for variety
+            const categoryGroups = data.reduce((acc, item) => {
+                if (!acc[item.category]) {
+                    acc[item.category] = [];
+                }
+                acc[item.category].push(item);
+                return acc;
+            }, {} as Record<string, RecentItem[]>);
+            
+            // Get one item from each category for selling deals, max 6 items
+            const sellingDeals: RecentItem[] = [];
+            Object.values(categoryGroups).forEach(categoryItems => {
+                if (sellingDeals.length < 6) {
+                    sellingDeals.push(categoryItems[0]); // Take first item from each category
+                }
+            });
+            
+            setSellingItems(sellingDeals);
+            
+        } catch (err) {
+            console.error('Error fetching recent items:', err);
+            setItemsError(err instanceof Error ? err.message : 'Failed to fetch recent items');
+            // Fallback to empty arrays
+            setRecentItems([]);
+            setSellingItems([]);
+        } finally {
+            setIsLoadingItems(false);
+        }
+    };
+
     // Fetch data on component mount
     useEffect(() => {
         fetchUserReport();
+        fetchRecentItems();
+
+        // Set up auto-refresh every 30 seconds
+        const interval = setInterval(() => {
+            console.log('Auto-refreshing dashboard data...');
+            fetchUserReport();
+            fetchRecentItems();
+        }, 30000); // 30 seconds
+
+        // Cleanup interval on component unmount
+        return () => clearInterval(interval);
     }, []);
 
     // Format currency values
@@ -151,155 +271,238 @@ export default function Dashboard() {
         }).format(value).replace('LKR', 'Rs');
     };
 
-    // Sample JSON for selling item deals
-    const sellingItems = [
-        { id: 1, name: 'Tomatoes', category: 'Vegetables' },
-        { id: 2, name: 'Carrots', category: 'Vegetables' },
-        { id: 3, name: 'Mango', category: 'Fruit' }
-    ];
+    // Remove the old getCategoryIcon function completely
 
-    // Mock data for recent items
-    const recentItems = [
-        { id: 1, name: 'Tomatoes', price: -2.50, category: 'Vegetables' },
-        { id: 2, name: 'Red Snapper', price: 12.75, category: 'Fish' },
-        { id: 3, name: 'Carrots', price: -1.20, category: 'Vegetables' },
-        { id: 4, name: 'Tuna', price: 15.40, category: 'Fish' }
-    ];
+    // Remove the old getPriceChangeInfo function and create a new one
+    const getPriceChangeInfo = (item: RecentItem) => {
+        return {
+            price: item.priceChanges,
+            isIncrease: item.priceChanges > 0
+        };
+    };
+
+    // Function to format price change display
+    const formatPriceChange = (priceChange: number): string => {
+        const prefix = priceChange > 0 ? '+' : '';
+        return `${prefix}Rs. ${priceChange.toFixed(2)}`;
+    };
 
     return (
-        <Box sx={{ p: 3 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-                <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
-                    📊 User Market Dashboard
-                </Typography>
-                <Button
-                    variant="outlined"
-                    onClick={fetchUserReport}
-                    disabled={isLoading}
-                    startIcon={isLoading ? <CircularProgress size={16} /> : undefined}
-                    sx={{ textTransform: 'none' }}
+        <Box sx={{ 
+            p: isMobile ? 2 : 3,
+            maxWidth: '100%',
+            overflowX: 'hidden'
+        }}>
+            {/* Header */}
+            <Box sx={{ 
+                display: 'flex', 
+                flexDirection: isMobile ? 'column' : 'row',
+                justifyContent: 'space-between', 
+                alignItems: isMobile ? 'flex-start' : 'center', 
+                mb: isMobile ? 3 : 4,
+                gap: isMobile ? 2 : 0
+            }}>
+                <Typography 
+                    variant={isMobile ? "h5" : "h4"} 
+                    component="h1" 
+                    sx={{ 
+                        fontWeight: 'bold',
+                        fontSize: isMobile ? '1.5rem' : '2.125rem'
+                    }}
                 >
-                    {isLoading ? 'Refreshing...' : 'Refresh Data'}
-                </Button>
+                    📊 Market Dashboard
+                </Typography>
+                
             </Box>
 
-            {/* Error Alert */}
+            {/* Error Alerts */}
             {error && (
                 <Alert 
                     severity="error" 
-                    sx={{ mb: 3 }}
-                    action={
-                        <Button color="inherit" size="small" onClick={fetchUserReport}>
-                            Retry
-                        </Button>
-                    }
+                    sx={{ 
+                        mb: 3,
+                        '& .MuiAlert-message': {
+                            fontSize: isMobile ? '0.875rem' : '1rem'
+                        }
+                    }}
                 >
                     Error loading dashboard data: {error}
                 </Alert>
             )}
 
-            {/* Summary Cards */}
-            <Grid container spacing={3} sx={{ mb: 3 }}>
-                <Grid item xs={12} sm={6} md={3}>
+            {itemsError && (
+                <Alert 
+                    severity="warning" 
+                    sx={{ 
+                        mb: 3,
+                        '& .MuiAlert-message': {
+                            fontSize: isMobile ? '0.875rem' : '1rem'
+                        }
+                    }}
+                >
+                    Error loading recent items: {itemsError}
+                </Alert>
+            )}
+
+            {/* Summary Cards - Responsive Grid */}
+            <Grid container spacing={isMobile ? 2 : 3} sx={{ mb: 3 }}>
+                <Grid item xs={6} sm={6} md={3}>
                     <SummaryCard
-                        title="🛒 Selling Posts"
+                        title="Selling Posts"
                         value={dashboardSummary.totalSellingPosts.toString()}
-                        icon={<StorefrontIcon fontSize="large" />}
+                        icon={<StorefrontIcon />}
                         color="#4caf50"
                         isLoading={isLoading}
                     />
                 </Grid>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid item xs={6} sm={6} md={3}>
                     <SummaryCard
-                        title="🛍️ Buying Posts"
+                        title="Buying Posts"
                         value={dashboardSummary.totalBuyingPosts.toString()}
-                        icon={<ShoppingCartIcon fontSize="large" />}
+                        icon={<ShoppingCartIcon />}
                         color="#2196f3"
                         isLoading={isLoading}
                     />
                 </Grid>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid item xs={6} sm={6} md={3}>
                     <SummaryCard
-                        title="💰 Total Profit"
+                        title="Total Profit"
                         value={isLoading ? '...' : formatCurrency(dashboardSummary.totalProfit)}
-                        icon={<TrendingUpIcon fontSize="large" />}
+                        icon={<TrendingUpIcon />}
                         color="#ff9800"
                         isLoading={isLoading}
                     />
                 </Grid>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid item xs={6} sm={6} md={3}>
                     <SummaryCard
-                        title="💸 Total Cost"
+                        title="Total Cost"
                         value={isLoading ? '...' : formatCurrency(dashboardSummary.totalCost)}
-                        icon={<AttachMoneyIcon fontSize="large" />}
+                        icon={<AttachMoneyIcon />}
                         color="#f44336"
                         isLoading={isLoading}
                     />
                 </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                    <SummaryCard
-                        title="🔔 Notifications"
-                        value={dashboardSummary.notificationCount.toString()}
-                        icon={
-                            <Badge
-                                color="error"
-                                variant="dot"
-                                invisible={dashboardSummary.notificationCount === 0}
-                            >
-                                <NotificationsIcon fontSize="large" />
-                            </Badge>
-                        }
-                        color="#5499c7"
-                        isLoading={false}
-                    />
-                </Grid>
             </Grid>
 
-            {/* API Data Display Section */}
+            {/* API Data Display Section - Mobile Responsive */}
             {userReport && !isLoading && (
                 <Grid container spacing={3} sx={{ mb: 3 }}>
                     <Grid item xs={12}>
-                        <Paper sx={{ p: 3, bgcolor: 'linear-gradient(135deg, #e8f5e8 0%, #c8e6c8 100%)' }}>
-                            <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: 'success.main' }}>
+                        <Paper sx={{ 
+                            p: isMobile ? 2 : 3, 
+                            bgcolor: 'linear-gradient(135deg, #e8f5e8 0%, #c8e6c8 100%)',
+                            borderRadius: 2
+                        }}>
+                            <Typography 
+                                variant={isMobile ? "subtitle1" : "h6"} 
+                                sx={{ 
+                                    mb: 2, 
+                                    fontWeight: 'bold', 
+                                    color: 'success.main',
+                                    textAlign: isMobile ? 'center' : 'left'
+                                }}
+                            >
                                 📈 Latest Report Summary
                             </Typography>
-                            <Grid container spacing={2}>
+                            <Grid container spacing={isMobile ? 1 : 2}>
                                 <Grid item xs={6} sm={3}>
-                                    <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'white', borderRadius: 2 }}>
-                                        <Typography variant="h4" color="success.main" fontWeight="bold">
+                                    <Box sx={{ 
+                                        textAlign: 'center', 
+                                        p: isMobile ? 1.5 : 2, 
+                                        bgcolor: 'white', 
+                                        borderRadius: 2 
+                                    }}>
+                                        <Typography 
+                                            variant={isMobile ? "h6" : "h4"} 
+                                            color="success.main" 
+                                            fontWeight="bold"
+                                            sx={{ fontSize: isMobile ? '1.25rem' : '2.125rem' }}
+                                        >
                                             {userReport.shared_selling_post_count}
                                         </Typography>
-                                        <Typography variant="body2" color="text.secondary">
+                                        <Typography 
+                                            variant="body2" 
+                                            color="text.secondary"
+                                            sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}
+                                        >
                                             Selling Posts
                                         </Typography>
                                     </Box>
                                 </Grid>
                                 <Grid item xs={6} sm={3}>
-                                    <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'white', borderRadius: 2 }}>
-                                        <Typography variant="h4" color="primary.main" fontWeight="bold">
+                                    <Box sx={{ 
+                                        textAlign: 'center', 
+                                        p: isMobile ? 1.5 : 2, 
+                                        bgcolor: 'white', 
+                                        borderRadius: 2 
+                                    }}>
+                                        <Typography 
+                                            variant={isMobile ? "h6" : "h4"} 
+                                            color="primary.main" 
+                                            fontWeight="bold"
+                                            sx={{ fontSize: isMobile ? '1.25rem' : '2.125rem' }}
+                                        >
                                             {userReport.shared_buying_post_count}
                                         </Typography>
-                                        <Typography variant="body2" color="text.secondary">
+                                        <Typography 
+                                            variant="body2" 
+                                            color="text.secondary"
+                                            sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}
+                                        >
                                             Buying Posts
                                         </Typography>
                                     </Box>
                                 </Grid>
                                 <Grid item xs={6} sm={3}>
-                                    <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'white', borderRadius: 2 }}>
-                                        <Typography variant="h4" color="warning.main" fontWeight="bold">
+                                    <Box sx={{ 
+                                        textAlign: 'center', 
+                                        p: isMobile ? 1.5 : 2, 
+                                        bgcolor: 'white', 
+                                        borderRadius: 2 
+                                    }}>
+                                        <Typography 
+                                            variant={isMobile ? "body1" : "h4"} 
+                                            color="warning.main" 
+                                            fontWeight="bold"
+                                            sx={{ 
+                                                fontSize: isMobile ? '1rem' : '2.125rem',
+                                                wordBreak: 'break-word'
+                                            }}
+                                        >
                                             {formatCurrency(parseFloat(userReport.total_profit))}
                                         </Typography>
-                                        <Typography variant="body2" color="text.secondary">
+                                        <Typography 
+                                            variant="body2" 
+                                            color="text.secondary"
+                                            sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}
+                                        >
                                             Total Profit
                                         </Typography>
                                     </Box>
                                 </Grid>
                                 <Grid item xs={6} sm={3}>
-                                    <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'white', borderRadius: 2 }}>
-                                        <Typography variant="h4" color="error.main" fontWeight="bold">
+                                    <Box sx={{ 
+                                        textAlign: 'center', 
+                                        p: isMobile ? 1.5 : 2, 
+                                        bgcolor: 'white', 
+                                        borderRadius: 2 
+                                    }}>
+                                        <Typography 
+                                            variant={isMobile ? "body1" : "h4"} 
+                                            color="error.main" 
+                                            fontWeight="bold"
+                                            sx={{ 
+                                                fontSize: isMobile ? '1rem' : '2.125rem',
+                                                wordBreak: 'break-word'
+                                            }}
+                                        >
                                             {formatCurrency(parseFloat(userReport.total_cost))}
                                         </Typography>
-                                        <Typography variant="body2" color="text.secondary">
+                                        <Typography 
+                                            variant="body2" 
+                                            color="text.secondary"
+                                            sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}
+                                        >
                                             Total Cost
                                         </Typography>
                                     </Box>
@@ -310,15 +513,20 @@ export default function Dashboard() {
                 </Grid>
             )}
 
-            {/* Main Dashboard Content */}
-            <Grid container spacing={3}>
+            {/* Main Dashboard Content - Mobile Responsive Layout */}
+            <Grid container spacing={isMobile ? 2 : 3}>
                 {/* Quick Actions */}
                 <Grid item xs={12} md={4}>
                     <StyledCard>
-                        <CardHeader title="🚀 Quick Actions" />
+                        <CardHeader 
+                            title="🚀 Quick Actions" 
+                            titleTypographyProps={{
+                                variant: isMobile ? 'subtitle1' : 'h6'
+                            }}
+                        />
                         <Divider />
                         <CardContent sx={{ flexGrow: 1 }}>
-                            <Grid container spacing={2}>
+                            <Grid container spacing={isMobile ? 1.5 : 2}>
                                 <Grid item xs={6}>
                                     <Button
                                         component={Link}
@@ -327,7 +535,11 @@ export default function Dashboard() {
                                         color="success"
                                         startIcon={<UploadFileIcon />}
                                         fullWidth
-                                        sx={{ textTransform: 'none' }}
+                                        size={isMobile ? "small" : "medium"}
+                                        sx={{ 
+                                            textTransform: 'none',
+                                            fontSize: isMobile ? '0.75rem' : '0.875rem'
+                                        }}
                                     >
                                         Upload CSV
                                     </Button>
@@ -336,7 +548,11 @@ export default function Dashboard() {
                                     <Button 
                                         variant="outlined" 
                                         fullWidth
-                                        sx={{ textTransform: 'none' }}
+                                        size={isMobile ? "small" : "medium"}
+                                        sx={{ 
+                                            textTransform: 'none',
+                                            fontSize: isMobile ? '0.75rem' : '0.875rem'
+                                        }}
                                     >
                                         Generate Report
                                     </Button>
@@ -345,7 +561,11 @@ export default function Dashboard() {
                                     <Button 
                                         variant="outlined" 
                                         fullWidth
-                                        sx={{ textTransform: 'none' }}
+                                        size={isMobile ? "small" : "medium"}
+                                        sx={{ 
+                                            textTransform: 'none',
+                                            fontSize: isMobile ? '0.75rem' : '0.875rem'
+                                        }}
                                     >
                                         Price Analysis
                                     </Button>
@@ -354,27 +574,39 @@ export default function Dashboard() {
                                     <Button 
                                         variant="outlined" 
                                         fullWidth
-                                        sx={{ textTransform: 'none' }}
-                                        onClick={fetchUserReport}
+                                        size={isMobile ? "small" : "medium"}
                                         disabled={isLoading}
+                                        sx={{ 
+                                            textTransform: 'none',
+                                            fontSize: isMobile ? '0.75rem' : '0.875rem'
+                                        }}
                                     >
-                                        {isLoading ? 'Loading...' : 'Refresh'}
+                                        {isLoading ? 'Loading...' : 'Manual Refresh'}
                                     </Button>
                                 </Grid>
                             </Grid>
                             
-                            <Box mt={3}>
+                            <Box mt={isMobile ? 2 : 3}>
                                 <StyledCard>
-                                    <CardHeader title="🛒 Selling Item Deals" />
+                                    <CardHeader 
+                                        title="Recent Market Items" 
+                                        titleTypographyProps={{
+                                            variant: isMobile ? 'body1' : 'subtitle1'
+                                        }}
+                                    />
                                     <Divider />
                                     <CardContent>
-                                        {sellingItems && sellingItems.length > 0 ? (
+                                        {isLoadingItems ? (
+                                            <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+                                                <CircularProgress size={24} />
+                                            </Box>
+                                        ) : sellingItems && sellingItems.length > 0 ? (
                                             sellingItems.map((item) => (
                                                 <Box
                                                     key={item.id}
                                                     sx={{
                                                         mb: 1,
-                                                        p: 2,
+                                                        p: isMobile ? 1.5 : 2,
                                                         border: '1px solid #e0e0e0',
                                                         borderRadius: 2,
                                                         bgcolor: '#f5f5f5',
@@ -385,17 +617,32 @@ export default function Dashboard() {
                                                         }
                                                     }}
                                                 >
-                                                    <Typography variant="body1" fontWeight="medium">
+                                                    <Typography 
+                                                        variant={isMobile ? "body2" : "body1"} 
+                                                        fontWeight="medium"
+                                                    >
                                                         {item.name}
                                                     </Typography>
-                                                    <Typography variant="body2" color="success.main">
-                                                        📦 {item.category}
+                                                    <Typography 
+                                                        variant="caption" 
+                                                        color="success.main" 
+                                                        sx={{ mt: 0.5, display: 'block' }}
+                                                    >
+                                                        {item.category}
+                                                    </Typography>
+                                                    <Typography 
+                                                        variant="caption" 
+                                                        color={item.priceChanges > 0 ? 'error.main' : 'success.main'}
+                                                        fontWeight="bold"
+                                                        sx={{ mt: 0.5, display: 'block' }}
+                                                    >
+                                                        {formatPriceChange(item.priceChanges)}
                                                     </Typography>
                                                 </Box>
                                             ))
                                         ) : (
                                             <Typography variant="body2" color="text.secondary">
-                                                No items to display
+                                                {itemsError ? 'Failed to load items' : 'No items to display'}
                                             </Typography>
                                         )}
                                     </CardContent>
@@ -408,24 +655,73 @@ export default function Dashboard() {
                 {/* Recent Updates */}
                 <Grid item xs={12} md={8}>
                     <StyledCard>
-                        <CardHeader title="📈 Recent Price Updates" />
+                        <CardHeader 
+                            title="Recent Price Updates" 
+                            titleTypographyProps={{
+                                variant: isMobile ? 'subtitle1' : 'h6'
+                            }}
+                        />
                         <Divider />
                         <List sx={{ flexGrow: 1 }}>
-                            {recentItems.map(item => (
-                                <ListItem key={item.id} divider>
-                                    <ListItemIcon>
-                                        {item.price > 0 ? (
-                                            <TrendingUpIcon color="success" />
-                                        ) : (
-                                            <TrendingDownIcon color="error" />
-                                        )}
-                                    </ListItemIcon>
+                            {isLoadingItems ? (
+                                <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                                    <CircularProgress />
+                                </Box>
+                            ) : recentItems && recentItems.length > 0 ? (
+                                recentItems.slice(0, isMobile ? 6 : 8).map((item) => {
+                                    const priceChange = getPriceChangeInfo(item);
+                                    return (
+                                        <ListItem key={item.id} divider>
+                                            <ListItemIcon>
+                                                {priceChange.isIncrease ? (
+                                                    <TrendingUpIcon color="error" />
+                                                ) : (
+                                                    <TrendingDownIcon color="success" />
+                                                )}
+                                            </ListItemIcon>
+                                            <ListItemText
+                                                primary={
+                                                    <Box sx={{ 
+                                                        display: 'flex', 
+                                                        alignItems: isMobile ? 'flex-start' : 'center', 
+                                                        gap: 1,
+                                                        flexDirection: isMobile ? 'column' : 'row'
+                                                    }}>
+                                                        <Typography 
+                                                            variant={isMobile ? "body2" : "body1"} 
+                                                            fontWeight="medium"
+                                                        >
+                                                            {item.name}
+                                                        </Typography>
+                                                        <Typography 
+                                                            variant="body2" 
+                                                            color={priceChange.isIncrease ? 'error.main' : 'success.main'}
+                                                            fontWeight="medium"
+                                                        >
+                                                            {formatPriceChange(item.priceChanges)}
+                                                        </Typography>
+                                                    </Box>
+                                                }
+                                                secondary={
+                                                    <Typography variant="body2" component="span">
+                                                        {item.category} • {priceChange.isIncrease ? 'Price Increased' : 'Price Decreased'}
+                                                    </Typography>
+                                                }
+                                            />
+                                        </ListItem>
+                                    );
+                                })
+                            ) : (
+                                <ListItem>
                                     <ListItemText
-                                        primary={`${item.name} - Rs ${Math.abs(item.price).toFixed(2)}`}
-                                        secondary={`📦 ${item.category} • ${item.price > 0 ? 'Price Increased' : 'Price Decreased'}`}
+                                        primary={
+                                            <Typography variant="body2" color="text.secondary" textAlign="center">
+                                                {itemsError ? 'Failed to load recent price updates' : 'No recent price updates available'}
+                                            </Typography>
+                                        }
                                     />
                                 </ListItem>
-                            ))}
+                            )}
                         </List>
                         <Box sx={{ p: 2 }}>
                             <Button
@@ -434,8 +730,9 @@ export default function Dashboard() {
                                 size="small"
                                 color="primary"
                                 sx={{ textTransform: 'none' }}
+                                startIcon={<StorefrontIcon />}
                             >
-                                📊 View All Items
+                                View All Items
                             </Button>
                         </Box>
                     </StyledCard>
