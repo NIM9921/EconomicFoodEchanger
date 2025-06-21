@@ -2,8 +2,11 @@ package com.economicfoodexchanger.sharedpost;
 
 import com.economicfoodexchanger.User;
 import com.economicfoodexchanger.UserDao;
+import com.economicfoodexchanger.sharedpost.delivery.Delivery;
+import com.economicfoodexchanger.sharedpost.delivery.DeliveryController;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.repository.query.Param;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -31,6 +34,12 @@ public class SharedPostController {
 
     @Autowired
     UserDao userDao;
+
+    @Autowired
+    BitDetailsController bitDetailsController;
+
+    @Autowired
+    DeliveryController deliveryController;
 
     @GetMapping("/all")
     public List<SharedPost> getAll() {
@@ -69,6 +78,8 @@ public class SharedPostController {
             sharedPost.setDiscription(description);
             sharedPost.setCreatedateandtime(LocalDateTime.now());
             sharedPost.setUsername(userDao.getReferenceById(userId));
+            sharedPost.setConformed(false);
+            sharedPost.setComplete(false);
 
             // Parse category status JSON
             sharedPost.setCategoreyStatus(categoryStatus);
@@ -278,4 +289,36 @@ public class SharedPostController {
         System.out.println(UserId.getId());
         return sharedPostList;
     }
+
+    //http://localhost:8080/sharedpost/updatebitconfirmation?bitid=1&sharedpostid=1
+    @PutMapping(value = "/updatebitconfirmation")
+    public boolean SharedPostConformation(@RequestBody Delivery delivery, @Param("bitid") Integer bitid, @Param("sharedpostid") Integer sharedpostid) {
+        if(bitDetailsController.UpdateConfirmation(bitid)){
+            Optional<SharedPost> sharedPostOptional = sharedPostDao.findById(sharedpostid);
+            if (sharedPostOptional.isPresent()) {
+                SharedPost sharedPost = sharedPostOptional.get();
+                sharedPost.setConformed(true);
+                sharedPostDao.save(sharedPost);
+
+                deliveryController.InitialDeliverySave(delivery, sharedPost);
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+
+    @GetMapping("/getposybyuserid")
+    public List<SharedPost> getPosyByUserId(){
+        Optional<User> userOptional = userDao.findById(12);
+        if (userOptional.isPresent()) {
+            User user = userOptional.get();
+            return sharedPostDao.getAllByUsername(user);
+        } else {
+            return new ArrayList<>(); // Return empty list if user not found
+        }
+    }
+
 }

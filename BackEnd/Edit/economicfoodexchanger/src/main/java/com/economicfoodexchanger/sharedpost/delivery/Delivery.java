@@ -20,7 +20,7 @@ public class Delivery {
     private Integer id;
 
     @Column(name = "tracking_number")
-    private Integer trackingNumber;
+    private String trackingNumber;
 
     @Column(name = "location", length = 45)
     private String location;
@@ -34,15 +34,15 @@ public class Delivery {
     @Column(name = "description")
     private String description;
 
-    @ManyToOne(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "delivery_staus_id", referencedColumnName = "id")
     private DeliveryStaus deliveryStatus;
 
-    @ManyToOne(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "payment_id", referencedColumnName = "id")
     private Payment payment;
 
-    @OneToOne
+    @OneToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "sharedpost_id", referencedColumnName = "id")
     private SharedPost sharedPost;
 }
