@@ -1,84 +1,70 @@
 package com.economicfoodexchanger.sharedpost.delivery;
 
-import com.economicfoodexchanger.sharedpost.SharedPost;
-import com.economicfoodexchanger.sharedpost.SharedPostDao;
-import com.economicfoodexchanger.sharedpost.payment.Payment;
-import com.economicfoodexchanger.sharedpost.payment.PaymentDao;
-import com.economicfoodexchanger.sharedpost.payment.PaymentType;
-import com.economicfoodexchanger.sharedpost.payment.PaymentTypeDao;
+import com.economicfoodexchanger.dto.DeliveryResponseDto;
+import com.economicfoodexchanger.dto.DeliveryWithStatusDto;
+import com.economicfoodexchanger.dto.UpdateStatusRequest;
+import com.economicfoodexchanger.service.DeliveryService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
-import java.math.BigDecimal;
+import java.util.List;
 
 @RestController
 @RequestMapping("/delivery")
 public class DeliveryController {
 
     @Autowired
-    DeliveryDao deliveryDao;
-
-    @Autowired
-    PaymentDao paymentDao;
-
-    @Autowired
-    PaymentTypeDao paymentTypeDao;
-
-    @Autowired
-    SharedPostDao sharedPostDao;
-
-    @Autowired
-    DeliveryStatusDao deliveryStatusDao;
+    private DeliveryService deliveryService;
 
     @GetMapping(value = "/getbypostid")
-    public Delivery DeliveryGetByPost(@RequestParam(value = "postId") Integer postId) {
-
-        SharedPost sharedPost = sharedPostDao.getReferenceById(postId);
-        return deliveryDao.findBysharedPost(sharedPost);
+    public DeliveryResponseDto getDeliveryByPost(@RequestParam(value = "postId") Integer postId) {
+        return deliveryService.getDeliveryByPostId(postId);
     }
 
     @GetMapping(value = "/getbyid")
-    public Delivery DeliveryGetByBit(@RequestParam(value = "deliveryid") Integer Id) {
-        return deliveryDao.getReferenceById(Id);
+    public DeliveryResponseDto getDeliveryById(@RequestParam(value = "deliveryid") Integer id) {
+        return deliveryService.getDeliveryById(id);
     }
 
-    public Delivery InitialDeliverySave(Delivery delivery, SharedPost post) {
-        Payment initalPayment = CreateInitialPayement();
-
-        if (initalPayment != null) {
-            delivery.setPayment(initalPayment);
-            
-            // Use findById instead of getReferenceById to get initialized entity
-            DeliveryStaus deliveryStatus = deliveryStatusDao.findById(3)
-                .orElseThrow(() -> new ResponseStatusException(
-                    org.springframework.http.HttpStatus.NOT_FOUND, 
-                    "Delivery status with ID 3 not found"));
-            
-            delivery.setDeliveryStatus(deliveryStatus);
-            delivery.setSharedPost(post);
-            return deliveryDao.save(delivery);
-        } else {
-            throw new ResponseStatusException(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR, "Failed to create initial payment for delivery");
-        }
-    }
-
-    public Payment CreateInitialPayement() {
-        BigDecimal amount = new BigDecimal("0.0");
-        
-        // Use findById instead of getReferenceById
-        PaymentType paymentType = paymentTypeDao.findById(5)
-            .orElseThrow(() -> new RuntimeException("Payment type with ID 5 not found"));
-        
-        Payment payment = new Payment();
-        payment.setAmount(amount);
-        payment.setPaymentType(paymentType);
-        payment.setStatus(false);
-
+    //http://localhost:8080/delivery/update-status
+    @PostMapping("/update-status")
+    public ResponseEntity<String> updateDeliveryStatus(@RequestBody UpdateStatusRequest request) {
         try {
-            return paymentDao.save(payment);
+            System.out.println("Received update request - DeliveryId: " + request.getDeliveryId() + ", StatusId: " + request.getStatusId());
+            
+            if (request.getDeliveryId() == null || request.getStatusId() == null) {
+                return ResponseEntity.badRequest().body("DeliveryId and StatusId are required");
+            }
+            
+            deliveryService.updateDeliveryStatus(request.getDeliveryId(), request.getStatusId());
+            return ResponseEntity.ok("Status updated successfully");
         } catch (Exception e) {
-            throw new RuntimeException("Failed to create initial payment: " + e.getMessage());
+            System.err.println("Error updating delivery status: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("Failed to update status: " + e.getMessage());
         }
+    }
+    
+    //http://localhost:8080/delivery/status-history/1
+    @GetMapping("/status-history/{deliveryId}")
+    public List<DeliveryStatusHistory> getStatusHistory(@PathVariable Integer deliveryId) {
+        return deliveryService.getStatusHistory(deliveryId);
+    }
+    
+    //http://localhost:8080/delivery/current-status/1
+    @GetMapping("/current-status/{deliveryId}")
+    public ResponseEntity<DeliveryStatusHistory> getCurrentStatus(@PathVariable Integer deliveryId) {
+        DeliveryStatusHistory currentStatus = deliveryService.getCurrentStatus(deliveryId);
+        if (currentStatus != null) {
+            return ResponseEntity.ok(currentStatus);
+        }
+        return ResponseEntity.notFound().build();
+    }
+    
+    //http://localhost:8080/delivery/getbypostid-with-status?postId=1
+    @GetMapping(value = "/getbypostid-with-status")
+    public DeliveryWithStatusDto getDeliveryWithStatus(@RequestParam(value = "postId") Integer postId) {
+        return deliveryService.getDeliveryWithStatus(postId);
     }
 }

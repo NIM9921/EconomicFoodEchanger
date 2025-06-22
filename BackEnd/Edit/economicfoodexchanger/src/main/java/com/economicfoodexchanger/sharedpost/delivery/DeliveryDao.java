@@ -2,9 +2,9 @@ package com.economicfoodexchanger.sharedpost.delivery;
 
 import com.economicfoodexchanger.sharedpost.SharedPost;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.stereotype.Repository;
 
-@EnableJpaRepositories
+@Repository
 public interface DeliveryDao extends JpaRepository<Delivery, Integer> {
-    Delivery findBysharedPost(SharedPost postId);
+    Delivery findBysharedPost(SharedPost sharedPost);
 }

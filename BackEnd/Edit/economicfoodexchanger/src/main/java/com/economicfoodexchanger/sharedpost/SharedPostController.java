@@ -4,6 +4,7 @@ import com.economicfoodexchanger.User;
 import com.economicfoodexchanger.UserDao;
 import com.economicfoodexchanger.sharedpost.delivery.Delivery;
 import com.economicfoodexchanger.sharedpost.delivery.DeliveryController;
+import com.economicfoodexchanger.service.DeliveryService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.repository.query.Param;
@@ -40,6 +41,9 @@ public class SharedPostController {
 
     @Autowired
     DeliveryController deliveryController;
+
+    @Autowired
+    DeliveryService deliveryService;
 
     @GetMapping("/all")
     public List<SharedPost> getAll() {
@@ -300,7 +304,7 @@ public class SharedPostController {
                 sharedPost.setConformed(true);
                 sharedPostDao.save(sharedPost);
 
-                deliveryController.InitialDeliverySave(delivery, sharedPost);
+                deliveryService.createInitialDelivery(delivery, sharedPost);
                 return true;
             } else {
                 return false;
