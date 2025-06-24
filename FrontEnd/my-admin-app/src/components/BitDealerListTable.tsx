@@ -193,6 +193,23 @@ export default function BitDealerListTable({
         return conformedstate ? 'success' : 'warning';
     };
 
+    // Add function to check if we're showing filtered results
+    const getDisplayInfo = () => {
+        if (!propBitDetails || propBitDetails.length === 0) {
+            return { showingAll: true, hasAccepted: false, totalBids: 0, acceptedBids: 0 };
+        }
+
+        const totalBids = propBitDetails.length;
+        const acceptedBids = propBitDetails.filter(bid => bid.conformedstate).length;
+        const hasAccepted = acceptedBids > 0;
+        
+        // If all bids are accepted, we're showing all
+        // If some bids are accepted but we have less than total, we're filtering
+        const showingAll = acceptedBids === 0 || acceptedBids === totalBids;
+
+        return { showingAll, hasAccepted, totalBids, acceptedBids };
+    };
+
     // Loading skeleton
     if (loading) {
         return (
@@ -268,12 +285,54 @@ export default function BitDealerListTable({
         );
     }
 
+    const displayInfo = getDisplayInfo();
+
     return (
         <>
             <Box sx={{ mt: 2, mb: 2 }}>
-                <Typography variant="h6" sx={{ mb: 2 }}>
-                    Bid Dealer Requests ({bitDetails.length})
-                </Typography>
+                {/* Enhanced header with filtering information */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Typography variant="h6">
+                        Bid Dealer Requests ({bitDetails.length})
+                    </Typography>
+                    
+                    {/* Show filtering status */}
+                    {!displayInfo.showingAll && displayInfo.hasAccepted && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Chip
+                                label="Showing Accepted Only"
+                                color="success"
+                                size="small"
+                                variant="outlined"
+                            />
+                            <Typography variant="caption" color="text.secondary">
+                                ({displayInfo.acceptedBids} accepted of {displayInfo.totalBids} total)
+                            </Typography>
+                        </Box>
+                    )}
+                    
+                    {displayInfo.showingAll && displayInfo.hasAccepted && (
+                        <Chip
+                            label="All Bids Accepted"
+                            color="success"
+                            size="small"
+                        />
+                    )}
+                </Box>
+
+                {/* Add info banner when showing only accepted bids */}
+                {!displayInfo.showingAll && displayInfo.hasAccepted && (
+                    <Alert 
+                        severity="info" 
+                        sx={{ mb: 2 }}
+                        icon={<CheckCircleIcon />}
+                    >
+                        <Typography variant="body2">
+                            <strong>Accepted Bids Only:</strong> This post has accepted bids. 
+                            Only confirmed deals are displayed below.
+                        </Typography>
+                    </Alert>
+                )}
 
                 <Grid container spacing={3}>
                     {currentBitDetails.map((bitDetail) => (
@@ -285,7 +344,12 @@ export default function BitDealerListTable({
                                     display: 'flex',
                                     flexDirection: 'column',
                                     borderLeft: 4,
-                                    borderColor: getStatusColor(bitDetail.conformedstate) + '.main'
+                                    borderColor: getStatusColor(bitDetail.conformedstate) + '.main',
+                                    // Add special styling for accepted bids
+                                    ...(bitDetail.conformedstate && {
+                                        bgcolor: 'rgba(76, 175, 80, 0.02)',
+                                        boxShadow: '0 4px 12px rgba(76, 175, 80, 0.15)'
+                                    })
                                 }}
                             >
                                 <CardContent sx={{ flexGrow: 1 }}>
@@ -294,13 +358,30 @@ export default function BitDealerListTable({
                                             <Avatar
                                                 src={getUserAvatar(bitDetail.user)}
                                                 alt={bitDetail.user.name}
-                                                sx={{ width: 50, height: 50, mr: 2 }}
+                                                sx={{ 
+                                                    width: 50, 
+                                                    height: 50, 
+                                                    mr: 2,
+                                                    // Add border for accepted bids
+                                                    ...(bitDetail.conformedstate && {
+                                                        border: '2px solid #4caf50'
+                                                    })
+                                                }}
                                             >
                                                 <PersonIcon />
                                             </Avatar>
                                             <Box>
                                                 <Typography variant="subtitle1" component="div">
                                                     {bitDetail.user.name}
+                                                    {/* Add crown icon for accepted bids */}
+                                                    {bitDetail.conformedstate && (
+                                                        <Chip
+                                                            label="DEAL PARTNER"
+                                                            size="small"
+                                                            color="success"
+                                                            sx={{ ml: 1, fontSize: '0.7rem', height: '20px' }}
+                                                        />
+                                                    )}
                                                 </Typography>
                                                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                                                     <Rating
@@ -319,6 +400,12 @@ export default function BitDealerListTable({
                                             label={getStatus(bitDetail.conformedstate)}
                                             color={getStatusColor(bitDetail.conformedstate)}
                                             size="small"
+                                            sx={{
+                                                ...(bitDetail.conformedstate && {
+                                                    fontWeight: 'bold',
+                                                    fontSize: '0.8rem'
+                                                })
+                                            }}
                                         />
                                     </Box>
 
@@ -351,11 +438,11 @@ export default function BitDealerListTable({
 
                                         {bitDetail.bitdetailscol && (
                                             <Box sx={{ 
-                                                bgcolor: 'grey.100', 
+                                                bgcolor: bitDetail.conformedstate ? 'success.50' : 'grey.100', 
                                                 p: 1, 
                                                 borderRadius: 1,
                                                 border: '1px solid',
-                                                borderColor: 'grey.200'
+                                                borderColor: bitDetail.conformedstate ? 'success.200' : 'grey.200'
                                             }}>
                                                 <Typography variant="caption" color="text.secondary" display="block">
                                                     Contact Details:
@@ -376,12 +463,18 @@ export default function BitDealerListTable({
                                         </Typography>
                                     </Box>
                                     <Button
-                                        variant="contained"
+                                        variant={bitDetail.conformedstate ? "contained" : "outlined"}
+                                        color={bitDetail.conformedstate ? "success" : "primary"}
                                         size="small"
                                         startIcon={<InfoIcon />}
                                         onClick={() => handleMoreInfoClick(bitDetail.id)}
+                                        sx={{
+                                            ...(bitDetail.conformedstate && {
+                                                fontWeight: 'bold'
+                                            })
+                                        }}
                                     >
-                                        View Details
+                                        {bitDetail.conformedstate ? 'Deal Details' : 'View Details'}
                                     </Button>
                                 </CardActions>
                             </Card>

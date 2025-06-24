@@ -758,6 +758,23 @@ export default function ScrollDialog({
         return null;
     }
 
+    // Add function to filter bids based on acceptance status
+    const getFilteredBitDetails = () => {
+        if (!postDetails?.bitDetails) {
+            return [];
+        }
+
+        const hasAcceptedBids = postDetails.bitDetails.some(bid => bid.conformedstate);
+        
+        if (hasAcceptedBids) {
+            // If there's at least one accepted bid, show only accepted bids
+            return postDetails.bitDetails.filter(bid => bid.conformedstate);
+        } else {
+            // If no accepted bids, show all bids
+            return postDetails.bitDetails;
+        }
+    };
+
     return (
         <Dialog
             open={isOpen}
@@ -1121,9 +1138,9 @@ export default function ScrollDialog({
                 <Box sx={{ mt: 3, mb: 2 }}>
                     <BitDealerListTable 
                         postId={postDetails?.id} 
-                        bitDetails={postDetails?.bitDetails}
+                        bitDetails={getFilteredBitDetails()} // Now this function is defined
                         key={refreshBids}
-                        onBidAccepted={handleBidAccepted} // Now this function is defined
+                        onBidAccepted={handleBidAccepted}
                     />
                 </Box>
             </DialogContent>

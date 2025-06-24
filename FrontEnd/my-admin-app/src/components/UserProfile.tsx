@@ -939,6 +939,24 @@ export default function UserProfile() {
             setSelectedBid(bid);
         };
 
+        // Add function to get filtered bids for display
+        const getFilteredBids = () => {
+            const hasAcceptedBids = post.bitDetails.some(bid => bid.conformedstate);
+            
+            if (hasAcceptedBids) {
+                // If there's at least one accepted bid, show only accepted bids
+                return post.bitDetails.filter(bid => bid.conformedstate);
+            } else {
+                // If no accepted bids, show all bids
+                return post.bitDetails;
+            }
+        };
+
+        const filteredBids = getFilteredBids();
+        const hasAcceptedBids = post.bitDetails.some(bid => bid.conformedstate);
+        const totalBids = post.bitDetails.length;
+        const acceptedBids = post.bitDetails.filter(bid => bid.conformedstate).length;
+
         return (
             <Card sx={{
                 mb: 3,
@@ -1124,11 +1142,20 @@ export default function UserProfile() {
                             />
                         )}
                         <Chip
-                            label={`${post.bitDetails.length} bid${post.bitDetails.length !== 1 ? 's' : ''}`}
+                            label={`${filteredBids.length} ${hasAcceptedBids ? 'confirmed deal' : 'bid'}${filteredBids.length !== 1 ? 's' : ''}`}
                             size="medium"
                             variant="outlined"
-                            color={post.bitDetails.length > 0 ? 'success' : 'default'}
+                            color={hasAcceptedBids ? 'success' : (post.bitDetails.length > 0 ? 'success' : 'default')}
                         />
+                        {/* Show additional info if filtering */}
+                        {hasAcceptedBids && acceptedBids < totalBids && (
+                            <Chip
+                                label={`${totalBids - acceptedBids} pending`}
+                                size="small"
+                                variant="outlined"
+                                color="warning"
+                            />
+                        )}
                         <Chip
                             label={post.complete ? 'Completed' : 'Active'}
                             size="medium"
@@ -1152,7 +1179,7 @@ export default function UserProfile() {
                     </Box>
 
                     {/* Enhanced Bids Management */}
-                    {post.bitDetails.length > 0 && (
+                    {filteredBids.length > 0 && (
                         <Box sx={{ 
                             bgcolor: 'rgba(0, 0, 0, 0.03)', 
                             borderRadius: 2, 
@@ -1160,9 +1187,16 @@ export default function UserProfile() {
                             border: '1px solid rgba(0, 0, 0, 0.1)' 
                         }}>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                                <Typography variant="h6" fontWeight="bold">
-                                    Bids Management ({post.bitDetails.length})
-                                </Typography>
+                                <Box>
+                                    <Typography variant="h6" fontWeight="bold">
+                                        {hasAcceptedBids ? 'Confirmed Deals' : 'Bids Management'} ({filteredBids.length})
+                                    </Typography>
+                                    {hasAcceptedBids && acceptedBids < totalBids && (
+                                        <Typography variant="caption" color="text.secondary">
+                                            Showing accepted deals only ({acceptedBids} of {totalBids} total bids)
+                                        </Typography>
+                                    )}
+                                </Box>
                                 <Button
                                     size="small"
                                     onClick={() => setExpandedBids(!expandedBids)}
@@ -1171,6 +1205,19 @@ export default function UserProfile() {
                                     {expandedBids ? 'Show Less' : 'Show All'}
                                 </Button>
                             </Box>
+
+                            {/* Add filtering notice */}
+                            {hasAcceptedBids && (
+                                <Alert 
+                                    severity="success" 
+                                    sx={{ mb: 2 }}
+                                    icon={<CheckCircleIcon />}
+                                >
+                                    <Typography variant="body2">
+                                        This post has confirmed deals. Only accepted bids are shown below.
+                                    </Typography>
+                                </Alert>
+                            )}
 
                             {/* Delivery Status Section - Show if any bid is confirmed */}
                             {post.bitDetails.some(bid => bid.conformedstate) && (
@@ -1184,12 +1231,17 @@ export default function UserProfile() {
 
                             <Collapse in={expandedBids} timeout="auto" unmountOnExit>
                                 <Stack spacing={2}>
-                                    {post.bitDetails.map((bid, index) => (
+                                    {filteredBids.map((bid, index) => (
                                         <Card key={bid.id} sx={{ 
                                             p: 2,
                                             bgcolor: 'white',
                                             border: `2px solid ${bid.conformedstate ? '#4caf50' : 'rgba(0, 0, 0, 0.05)'}`,
-                                            position: 'relative'
+                                            position: 'relative',
+                                            // Enhanced styling for accepted bids
+                                            ...(bid.conformedstate && {
+                                                boxShadow: '0 4px 12px rgba(76, 175, 80, 0.15)',
+                                                bgcolor: 'rgba(76, 175, 80, 0.02)'
+                                            })
                                         }}>
                                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
@@ -1283,11 +1335,16 @@ export default function UserProfile() {
 
                             {!expandedBids && (
                                 <Stack spacing={2}>
-                                    {post.bitDetails.slice(0, 2).map((bid, index) => (
+                                    {filteredBids.slice(0, 2).map((bid, index) => (
                                         <Card key={bid.id} sx={{ 
                                             p: 2,
                                             bgcolor: 'white',
-                                            border: `2px solid ${bid.conformedstate ? '#4caf50' : 'rgba(0, 0, 0, 0.05)'}`
+                                            border: `2px solid ${bid.conformedstate ? '#4caf50' : 'rgba(0, 0, 0, 0.05)'}`,
+                                            // Enhanced styling for accepted bids
+                                            ...(bid.conformedstate && {
+                                                boxShadow: '0 4px 12px rgba(76, 175, 80, 0.15)',
+                                                bgcolor: 'rgba(76, 175, 80, 0.02)'
+                                            })
                                         }}>
                                             {/* Same bid content as above but shortened */}
                                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1330,8 +1387,8 @@ export default function UserProfile() {
                         </Box>
                     )}
 
-                    {/* No bids message */}
-                    {post.bitDetails.length === 0 && (
+                    {/* No bids message - updated for filtered view */}
+                    {filteredBids.length === 0 && post.bitDetails.length === 0 && (
                         <Box sx={{ 
                             textAlign: 'center', 
                             py: 4,
@@ -1344,6 +1401,24 @@ export default function UserProfile() {
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
                                 Waiting for community members to place bids on this post.
+                            </Typography>
+                        </Box>
+                    )}
+
+                    {/* Message when all bids are pending (not shown due to filter) */}
+                    {filteredBids.length === 0 && post.bitDetails.length > 0 && (
+                        <Box sx={{ 
+                            textAlign: 'center', 
+                            py: 4,
+                            bgcolor: 'rgba(255, 193, 7, 0.02)',
+                            borderRadius: 2,
+                            border: '1px dashed rgba(255, 193, 7, 0.3)'
+                        }}>
+                            <Typography variant="body1" color="text.secondary" gutterBottom>
+                                ⏳ All bids are pending
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                You have {post.bitDetails.length} pending bid{post.bitDetails.length !== 1 ? 's' : ''} waiting for your review.
                             </Typography>
                         </Box>
                     )}
