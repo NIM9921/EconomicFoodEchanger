@@ -67,9 +67,14 @@ interface BitDealerListTableProps {
     postId?: number;
     bitDetails?: BitDetail[];
     key?: number; // Add key prop for forcing refresh
+    onBidAccepted?: () => void; // Add callback prop
 }
 
-export default function BitDealerListTable({ postId, bitDetails: propBitDetails }: BitDealerListTableProps) {
+export default function BitDealerListTable({ 
+    postId, 
+    bitDetails: propBitDetails, 
+    onBidAccepted 
+}: BitDealerListTableProps) {
     const [page, setPage] = React.useState(1);
     const [moreInfoOpen, setMoreInfoOpen] = React.useState(false);
     const [selectedDealId, setSelectedDealId] = React.useState<number | null>(null);
@@ -80,13 +85,14 @@ export default function BitDealerListTable({ postId, bitDetails: propBitDetails 
 
     const dealersPerPage = 4;
 
-    // Use prop bitDetails first, then fetch if not available
+    // Optimize useEffect to prevent duplicate calls
     React.useEffect(() => {
-        if (propBitDetails && propBitDetails.length > 0) {
+        if (propBitDetails && propBitDetails.length >= 0) {
             console.log('Using provided bitDetails:', propBitDetails);
             setBitDetails(propBitDetails);
             setLoading(false);
-        } else if (postId) {
+            setPage(1); // Reset to first page when data updates
+        } else if (postId && !propBitDetails) {
             console.log('Fetching fresh bitDetails from API...');
             fetchBitDetails();
         } else {
@@ -94,24 +100,7 @@ export default function BitDealerListTable({ postId, bitDetails: propBitDetails 
             setBitDetails([]);
             setLoading(false);
         }
-    }, [postId, propBitDetails]); // Removed refreshTrigger
-
-    // Force refresh when bid details change
-    React.useEffect(() => {
-        if (propBitDetails && propBitDetails.length >= 0) {
-            console.log('BitDealerListTable: Updating with new bitDetails:', propBitDetails.length);
-            setBitDetails(propBitDetails);
-            setLoading(false);
-            setPage(1); // Reset to first page when data updates
-        } else if (postId && !propBitDetails) {
-            console.log('BitDealerListTable: No propBitDetails, fetching from API...');
-            fetchBitDetails();
-        } else {
-            console.log('BitDealerListTable: No bitDetails available');
-            setBitDetails([]);
-            setLoading(false);
-        }
-    }, [postId, propBitDetails]);
+    }, [postId, JSON.stringify(propBitDetails)]); // Use JSON.stringify to prevent unnecessary re-renders
 
     const fetchBitDetails = async () => {
         if (!postId) return;
@@ -166,6 +155,22 @@ export default function BitDealerListTable({ postId, bitDetails: propBitDetails 
         setMoreInfoOpen(false);
         setSelectedBitDetail(null);
         setSelectedDealId(null);
+    };
+
+    // Handle when bid is accepted from the MoreInfoDeal dialog
+    const handleBidAccepted = () => {
+        // Refresh the bit details by refetching or calling parent callback
+        if (onBidAccepted) {
+            onBidAccepted();
+        }
+        
+        // Also refresh local data if we have postId
+        if (postId) {
+            fetchBitDetails();
+        }
+        
+        // Close the dialog
+        handleMoreInfoClose();
     };
 
     // Get current dealers for pagination
@@ -403,6 +408,8 @@ export default function BitDealerListTable({ postId, bitDetails: propBitDetails 
                     onClose={handleMoreInfoClose}
                     dealId={selectedDealId}
                     bitDetail={selectedBitDetail}
+                    sharedPostId={postId} // Pass the shared post ID
+                    onBidAccepted={handleBidAccepted} // Pass the callback
                 />
             )}
         </>

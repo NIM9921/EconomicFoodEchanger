@@ -5,7 +5,6 @@ import Button from "@mui/material/Button";
 import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
-import DialogContentText from "@mui/material/DialogContentText";
 import DialogTitle from "@mui/material/DialogTitle";
 import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
@@ -16,17 +15,39 @@ import MobileStepper from "@mui/material/MobileStepper";
 import KeyboardArrowLeft from "@mui/icons-material/KeyboardArrowLeft";
 import KeyboardArrowRight from "@mui/icons-material/KeyboardArrowRight";
 import SwipeableViews from "react-swipeable-views";
-import { autoPlay } from "react-swipeable-views-utils";
 import TextField from "@mui/material/TextField";
 import Rating from "@mui/material/Rating";
 import TurnedInNotIcon from "@mui/icons-material/TurnedInNot";
 import HandshakeIcon from "@mui/icons-material/Handshake";
 import BitDealerListTable from './BitDealerListTable';
 import LaunchIcon from "@mui/icons-material/Launch";
-import { Alert } from "@mui/material";
+import { Alert, Chip, Divider, Grid, Accordion, AccordionSummary, AccordionDetails } from "@mui/material";
 import ApiConfig from '../utils/ApiConfig';
+import {
+    Timeline,
+    TimelineItem,
+    TimelineSeparator,
+    TimelineConnector,
+    TimelineContent,
+    TimelineDot,
+    TimelineOppositeContent
+} from '@mui/lab';
+import {
+    LocalShipping as LocalShippingIcon,
+    CheckCircle as CheckCircleIcon,
+    Schedule as ScheduleIcon,
+    Inventory as InventoryIcon,
+    Build as BuildIcon,
+    FlightTakeoff as FlightTakeoffIcon,
+    DirectionsRun as DirectionsRunIcon,
+    Home as HomeIcon,
+    ExpandMore as ExpandMoreIcon,
+    TrackChanges as TrackChangesIcon,
+    Payment as PaymentIcon
+} from '@mui/icons-material';
 
-const AutoPlaySwipeableViews = autoPlay(SwipeableViews);
+// Remove AutoPlaySwipeableViews to avoid the warning
+// const AutoPlaySwipeableViews = autoPlay(SwipeableViews);
 
 interface PostUser {
     id: number;
@@ -103,6 +124,44 @@ interface ScrollDialogProps {
     onBidSubmitted?: () => void; // Add callback prop
 }
 
+// Add delivery interfaces
+interface DeliveryStatus {
+    id: number;
+    name: string;
+}
+
+interface StatusHistory {
+    id: number;
+    statusDateChange: string;
+    deliveryStaus: DeliveryStatus;
+}
+
+interface Payment {
+    id: number;
+    amount: number;
+    note: string | null;
+    file: string | null;
+    status: boolean;
+    filetype: string | null;
+    paymentType: {
+        id: number;
+        name: string;
+    };
+}
+
+interface DeliveryData {
+    id: number;
+    trackingNumber: string;
+    location: string;
+    currentPackageLocation: string;
+    deliveryCompany: string;
+    description: string;
+    payment: Payment;
+    sharedPost: any;
+    currentStatus: DeliveryStatus;
+    statusHistory: StatusHistory[];
+}
+
 export default function ScrollDialog({ 
     open = true, 
     setOpen, 
@@ -119,6 +178,22 @@ export default function ScrollDialog({
     const [activeStep, setActiveStep] = React.useState(0);
     const [bidSubmittedFlag, setBidSubmittedFlag] = React.useState(false);
     const [refreshBids, setRefreshBids] = React.useState(0);
+
+    // Add delivery tracking state
+    const [deliveryData, setDeliveryData] = React.useState<DeliveryData | null>(null);
+    const [deliveryLoading, setDeliveryLoading] = React.useState(false);
+    const [deliveryError, setDeliveryError] = React.useState<string>('');
+
+    // Add bid form state (consolidated - remove duplicates)
+    const [bidData, setBidData] = React.useState({
+        bitrate: '',
+        needamount: '',
+        bitdetailscol: '',
+        deliverylocation: ''
+    });
+    const [isSubmittingBid, setIsSubmittingBid] = React.useState(false);
+    const [bidError, setBidError] = React.useState('');
+    const [bidSuccess, setBidSuccess] = React.useState('');
 
     // Debug logging
     React.useEffect(() => {
@@ -189,15 +264,47 @@ export default function ScrollDialog({
         handleClose();
     };
 
+    // Add auto-play functionality manually to avoid UNSAFE_componentWillReceiveProps
+    const [autoPlayActive, setAutoPlayActive] = React.useState(true);
+    const autoPlayIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
+
+    // Auto-play functionality
+    React.useEffect(() => {
+        if (autoPlayActive && displayImages.length > 1) {
+            autoPlayIntervalRef.current = setInterval(() => {
+                setActiveStep((prev) => (prev + 1) % displayImages.length);
+            }, 3000); // Change slide every 3 seconds
+        }
+
+        return () => {
+            if (autoPlayIntervalRef.current) {
+                clearInterval(autoPlayIntervalRef.current);
+            }
+        };
+    }, [autoPlayActive, displayImages.length]);
+
+    // Pause auto-play on user interaction
+    const handleUserInteraction = () => {
+        setAutoPlayActive(false);
+        if (autoPlayIntervalRef.current) {
+            clearInterval(autoPlayIntervalRef.current);
+        }
+    };
+
     const handleNext = () => {
-        setActiveStep((prevActiveStep) => prevActiveStep + 1);
+        handleUserInteraction();
+        setActiveStep((prevActiveStep) => (prevActiveStep + 1) % displayImages.length);
     };
 
     const handleBack = () => {
-        setActiveStep((prevActiveStep) => prevActiveStep - 1);
+        handleUserInteraction();
+        setActiveStep((prevActiveStep) => 
+            prevActiveStep === 0 ? displayImages.length - 1 : prevActiveStep - 1
+        );
     };
 
     const handleStepChange = (step: number) => {
+        handleUserInteraction();
         setActiveStep(step);
     };
 
@@ -270,17 +377,6 @@ export default function ScrollDialog({
     if (!isOpen) {
         return null;
     }
-
-    // Add new state for bid form
-    const [bidData, setBidData] = React.useState({
-        bitrate: '',
-        needamount: '',
-        bitdetailscol: '',
-        deliverylocation: ''
-    });
-    const [isSubmittingBid, setIsSubmittingBid] = React.useState(false);
-    const [bidError, setBidError] = React.useState('');
-    const [bidSuccess, setBidSuccess] = React.useState('');
 
     // Handle bid form input changes
     const handleBidInputChange = (field: string, value: string) => {
@@ -393,6 +489,275 @@ export default function ScrollDialog({
         }
     };
 
+    // Add function to fetch delivery data
+    const fetchDeliveryData = async () => {
+        if (!postDetails?.id) return;
+
+        try {
+            setDeliveryLoading(true);
+            setDeliveryError('');
+            
+            const response = await fetch(`${ApiConfig.Domain}/delivery/getbypostid?postId=${postDetails.id}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (response.ok) {
+                const data: DeliveryData = await response.json();
+                console.log('Fetched delivery data:', data);
+                setDeliveryData(data);
+            } else if (response.status === 404) {
+                // No delivery data available
+                setDeliveryData(null);
+            } else {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+        } catch (err) {
+            console.error('Error fetching delivery data:', err);
+            setDeliveryError('Failed to load delivery information');
+            setDeliveryData(null);
+        } finally {
+            setDeliveryLoading(false);
+        }
+    };
+
+    // Fetch delivery data when component mounts and has confirmed bids
+    React.useEffect(() => {
+        if (postDetails?.id && postDetails?.bitDetails) {
+            const hasConfirmedBids = postDetails.bitDetails.some(bid => bid.conformedstate);
+            if (hasConfirmedBids) {
+                fetchDeliveryData();
+            }
+        }
+    }, [postDetails?.id, postDetails?.bitDetails]);
+
+    // Add the missing handleBidAccepted function
+    const handleBidAccepted = () => {
+        // Refresh bids data
+        setRefreshBids(prev => prev + 1);
+        
+        // Call parent callback if provided
+        if (onBidSubmitted) {
+            onBidSubmitted();
+        }
+        
+        // Refetch delivery data since a bid was accepted
+        if (postDetails?.id) {
+            fetchDeliveryData();
+        }
+    };
+
+    // Add missing formatDeliveryDate function
+    const formatDeliveryDate = (timestamp: string): string => {
+        try {
+            const date = new Date(timestamp);
+            return date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        } catch (e) {
+            return timestamp;
+        }
+    };
+
+    // Add missing getDeliveryStatusColor function
+    const getDeliveryStatusColor = (statusName: string) => {
+        switch (statusName.toLowerCase()) {
+            case 'order placed': return 'info';
+            case 'order confirmed': return 'primary';
+            case 'processing': return 'secondary';
+            case 'ready for dispatch': return 'warning';
+            case 'shipped': return 'warning';
+            case 'in transit': return 'warning';
+            case 'out for delivery': return 'secondary';
+            case 'delivered': return 'success';
+            default: return 'default';
+        }
+    };
+
+    // Add missing getDeliveryStatusIcon function
+    const getDeliveryStatusIcon = (statusName: string) => {
+        switch (statusName.toLowerCase()) {
+            case 'order placed': return <InventoryIcon />;
+            case 'order confirmed': return <CheckCircleIcon />;
+            case 'processing': return <BuildIcon />;
+            case 'ready for dispatch': return <FlightTakeoffIcon />;
+            case 'shipped': return <LocalShippingIcon />;
+            case 'in transit': return <LocalShippingIcon />;
+            case 'out for delivery': return <DirectionsRunIcon />;
+            case 'delivered': return <HomeIcon />;
+            default: return <ScheduleIcon />;
+        }
+    };
+
+    // Delivery Status Timeline Component
+    const DeliveryStatusTimeline = () => {
+        if (deliveryLoading) {
+            return (
+                <Box sx={{ p: 3, textAlign: 'center' }}>
+                    <Typography>Loading delivery information...</Typography>
+                </Box>
+            );
+        }
+
+        if (deliveryError || !deliveryData) {
+            return (
+                <Box sx={{ 
+                    p: 3, 
+                    textAlign: 'center',
+                    bgcolor: 'rgba(0, 0, 0, 0.02)',
+                    borderRadius: 2,
+                    border: '1px dashed rgba(0, 0, 0, 0.1)'
+                }}>
+                    <TrackChangesIcon sx={{ fontSize: 40, color: 'text.secondary', mb: 1 }} />
+                    <Typography variant="body2" color="text.secondary">
+                        {deliveryError || 'No delivery information available'}
+                    </Typography>
+                </Box>
+            );
+        }
+
+        // Sort status history by date (newest first)
+        const sortedHistory = [...deliveryData.statusHistory].sort((a, b) => 
+            new Date(b.statusDateChange).getTime() - new Date(a.statusDateChange).getTime()
+        );
+
+        return (
+            <Accordion defaultExpanded>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <LocalShippingIcon color="primary" />
+                        <Typography variant="h6" fontWeight="bold">
+                            🚚 Delivery Tracking
+                        </Typography>
+                        <Chip
+                            label={deliveryData.currentStatus.name}
+                            color={getDeliveryStatusColor(deliveryData.currentStatus.name)}
+                            icon={getDeliveryStatusIcon(deliveryData.currentStatus.name)}
+                            size="medium"
+                        />
+                    </Box>
+                </AccordionSummary>
+                <AccordionDetails>
+                    {/* Delivery Header Info */}
+                    <Box sx={{ mb: 3, p: 2, bgcolor: 'rgba(76, 175, 80, 0.05)', borderRadius: 2 }}>
+                        <Grid container spacing={2}>
+                            <Grid item xs={12} sm={6}>
+                                <Typography variant="body2" color="text.secondary">Tracking Number</Typography>
+                                <Typography variant="body1" fontWeight="bold">
+                                    {deliveryData.trackingNumber}
+                                </Typography>
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <Typography variant="body2" color="text.secondary">Delivery Company</Typography>
+                                <Typography variant="body1" fontWeight="bold">
+                                    {deliveryData.deliveryCompany}
+                                </Typography>
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <Typography variant="body2" color="text.secondary">Current Location</Typography>
+                                <Typography variant="body1" fontWeight="medium">
+                                    📍 {deliveryData.currentPackageLocation}
+                                </Typography>
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <Typography variant="body2" color="text.secondary">Delivery Location</Typography>
+                                <Typography variant="body1" fontWeight="medium">
+                                    🎯 {deliveryData.location}
+                                </Typography>
+                            </Grid>
+                            {deliveryData.description && (
+                                <Grid item xs={12}>
+                                    <Typography variant="body2" color="text.secondary">Description</Typography>
+                                    <Typography variant="body2">
+                                        {deliveryData.description}
+                                    </Typography>
+                                </Grid>
+                            )}
+                        </Grid>
+                    </Box>
+
+                    {/* Payment Information */}
+                    {deliveryData.payment && (
+                        <Box sx={{ mb: 3, p: 2, bgcolor: 'rgba(33, 150, 243, 0.05)', borderRadius: 2 }}>
+                            <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                                💳 Payment Details
+                            </Typography>
+                            <Grid container spacing={2}>
+                                <Grid item xs={6}>
+                                    <Typography variant="body2" color="text.secondary">Amount</Typography>
+                                    <Typography variant="body1" fontWeight="bold">
+                                        Rs. {deliveryData.payment.amount.toFixed(2)}
+                                    </Typography>
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <Typography variant="body2" color="text.secondary">Status</Typography>
+                                    <Chip
+                                        label={deliveryData.payment.status ? 'Paid' : 'Pending'}
+                                        color={deliveryData.payment.status ? 'success' : 'warning'}
+                                        size="small"
+                                        icon={<PaymentIcon />}
+                                    />
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <Typography variant="body2" color="text.secondary">Payment Type</Typography>
+                                    <Typography variant="body1">
+                                        {deliveryData.payment.paymentType.name}
+                                    </Typography>
+                                </Grid>
+                                {deliveryData.payment.note && (
+                                    <Grid item xs={12}>
+                                        <Typography variant="body2" color="text.secondary">Note</Typography>
+                                        <Typography variant="body2">
+                                            {deliveryData.payment.note}
+                                        </Typography>
+                                    </Grid>
+                                )}
+                            </Grid>
+                        </Box>
+                    )}
+
+                    {/* Status History Timeline */}
+                    <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                        📈 Delivery Timeline
+                    </Typography>
+                    <Timeline>
+                        {sortedHistory.map((status, index) => (
+                            <TimelineItem key={status.id}>
+                                <TimelineOppositeContent sx={{ m: 'auto 0' }} variant="body2" color="text.secondary">
+                                    {formatDeliveryDate(status.statusDateChange)}
+                                </TimelineOppositeContent>
+                                <TimelineSeparator>
+                                    <TimelineDot color={getDeliveryStatusColor(status.deliveryStaus.name)}>
+                                        {getDeliveryStatusIcon(status.deliveryStaus.name)}
+                                    </TimelineDot>
+                                    {index < sortedHistory.length - 1 && <TimelineConnector />}
+                                </TimelineSeparator>
+                                <TimelineContent sx={{ py: '12px', px: 2 }}>
+                                    <Typography variant="h6" component="span" fontWeight="bold">
+                                        {status.deliveryStaus.name}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        Status updated
+                                    </Typography>
+                                </TimelineContent>
+                            </TimelineItem>
+                        ))}
+                    </Timeline>
+                </AccordionDetails>
+            </Accordion>
+        );
+    };
+
+    if (!isOpen) {
+        return null;
+    }
+
     return (
         <Dialog
             open={isOpen}
@@ -402,8 +767,9 @@ export default function ScrollDialog({
             aria-describedby="scroll-dialog-description"
             maxWidth="md"
             fullWidth
-            disableEscapeKeyDown={isSubmittingBid} // Prevent ESC key during submission
+            disableEscapeKeyDown={isSubmittingBid}
         >
+            {/* Fix the HTML nesting issue in DialogTitle */}
             <DialogTitle id="scroll-dialog-title" sx={{ p: 2 }}>
                 <Box sx={{ flexGrow: 1 }}>
                     <Stack direction="row" spacing={2} alignItems="center">
@@ -413,10 +779,20 @@ export default function ScrollDialog({
                             src={postDetails?.user?.avatar || "https://images.unsplash.com/photo-1598170845058-32b9d6a5da37"}
                         />
                         <Box sx={{ flexGrow: 1 }}>
-                            <Typography variant="h6">
+                            {/* Fix: Use span instead of Typography with h6 to avoid nesting h6 inside h2 */}
+                            <Box
+                                component="span"
+                                sx={{
+                                    fontSize: '1.25rem',
+                                    fontWeight: 500,
+                                    lineHeight: 1.6,
+                                    display: 'block',
+                                    color: 'text.primary'
+                                }}
+                            >
                                 {postDetails?.user?.name || "User Name"}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
+                            </Box>
+                            <Typography variant="body2" color="text.secondary" component="div">
                                 📍 {postDetails?.user?.city || "Location"} • 📞 {postDetails?.user?.mobileNumber || "Phone"}
                             </Typography>
                             <Rating
@@ -424,6 +800,7 @@ export default function ScrollDialog({
                                 defaultValue={3.75}
                                 precision={0.5}
                                 readOnly
+                                size="small"
                             />
                         </Box>
                         <Button variant="contained" color="success">
@@ -435,7 +812,7 @@ export default function ScrollDialog({
             </DialogTitle>
 
             <DialogContent dividers={scroll === "paper"}>
-                {/* Remove the test content and just show normal content */}
+                {/* Image carousel with manual SwipeableViews (no autoPlay) */}
                 <Box sx={{ maxWidth: "100%", flexGrow: 1, mb: 3 }}>
                     <Paper
                         square
@@ -450,11 +827,13 @@ export default function ScrollDialog({
                     >
                         <Typography>{displayImages[activeStep]?.label}</Typography>
                     </Paper>
-                    <AutoPlaySwipeableViews
+                    {/* Use regular SwipeableViews without autoPlay */}
+                    <SwipeableViews
                         axis="x"
                         index={activeStep}
                         onChangeIndex={handleStepChange}
                         enableMouseEvents
+                        resistance
                     >
                         {displayImages.map((step, index) => (
                             <div key={step.label}>
@@ -478,7 +857,7 @@ export default function ScrollDialog({
                                 ) : null}
                             </div>
                         ))}
-                    </AutoPlaySwipeableViews>
+                    </SwipeableViews>
                     <MobileStepper
                         steps={maxSteps}
                         position="static"
@@ -487,7 +866,7 @@ export default function ScrollDialog({
                             <Button
                                 size="small"
                                 onClick={handleNext}
-                                disabled={activeStep === maxSteps - 1}
+                                disabled={maxSteps <= 1}
                             >
                                 Next
                                 <KeyboardArrowRight />
@@ -497,7 +876,7 @@ export default function ScrollDialog({
                             <Button
                                 size="small"
                                 onClick={handleBack}
-                                disabled={activeStep === 0}
+                                disabled={maxSteps <= 1}
                             >
                                 <KeyboardArrowLeft />
                                 Back
@@ -538,6 +917,13 @@ export default function ScrollDialog({
                                 <strong>Coordinates:</strong> {postDetails.user.latitude.toFixed(6)}, {postDetails.user.longitude.toFixed(6)}
                             </Typography>
                         )}
+                    </Box>
+                )}
+
+                {/* Delivery Tracking Section - Show only if there are confirmed bids */}
+                {postDetails?.bitDetails?.some(bid => bid.conformedstate) && (
+                    <Box sx={{ mb: 3 }}>
+                        <DeliveryStatusTimeline />
                     </Box>
                 )}
 
@@ -736,14 +1122,15 @@ export default function ScrollDialog({
                     <BitDealerListTable 
                         postId={postDetails?.id} 
                         bitDetails={postDetails?.bitDetails}
-                        key={refreshBids} // Force refresh when bids change
+                        key={refreshBids}
+                        onBidAccepted={handleBidAccepted} // Now this function is defined
                     />
                 </Box>
             </DialogContent>
             <DialogActions>
                 <Button 
                     onClick={handleClose}
-                    disabled={isSubmittingBid} // Disable cancel during submission
+                    disabled={isSubmittingBid}
                 >
                     {isSubmittingBid ? 'Submitting...' : 'Cancel'}
                 </Button>

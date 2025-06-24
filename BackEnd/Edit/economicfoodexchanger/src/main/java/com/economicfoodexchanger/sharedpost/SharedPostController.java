@@ -316,7 +316,7 @@ public class SharedPostController {
 
     @GetMapping("/getposybyuserid")
     public List<SharedPost> getPosyByUserId(){
-        Optional<User> userOptional = userDao.findById(12);
+        Optional<User> userOptional = userDao.findById(1);
         if (userOptional.isPresent()) {
             User user = userOptional.get();
             return sharedPostDao.getAllByUsername(user);

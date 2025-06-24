@@ -105,5 +105,11 @@ public class UserController {
         return "User not found";
     }
 
+    @GetMapping("/getbyid")
+    public User getUserById(Integer id) {
+
+        Optional<User> user = userDao.findById(1);
+        return user.orElse(null);
+    }
 
 }
