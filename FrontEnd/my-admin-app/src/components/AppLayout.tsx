@@ -5,7 +5,7 @@ import CssBaseline from '@mui/material/CssBaseline';
 import PrimarySearchAppBar from './PrimarySearchAppBar';
 import SidebarMenu from './SidebarMenu';
 import DealersDetails from './DealersDetails.tsx';
-import { BrowserRouter as Router, Routes, Route, Navigate  } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import Dashboard from './Dashboard';
 import Reports from './Reports';
 import Integrations from './Integrations';
@@ -13,6 +13,7 @@ import Settings from './Settings';
 import Home from "./Home.tsx";
 import Login from "./Login.tsx";
 import UserRegistration from './UserRegistrstion.tsx';
+import UserProfile from './UserProfile.tsx';
 
 const drawerWidth = 240;
 
@@ -66,12 +67,10 @@ export default function AppLayout() {
 
     const handleLogout = () => {
         localStorage.removeItem('isLoggedIn');
-        setIsAuthenticated(false);
-        localStorage.removeItem('isLoggedIn');
         localStorage.removeItem('userRole');
         localStorage.removeItem('FirstName');
         localStorage.removeItem('LastName');
-        navigate('/login');
+        setIsAuthenticated(false);
     };
 
     return (
@@ -95,14 +94,15 @@ export default function AppLayout() {
                                 <Route path="/reports" element={<Reports />} />
                                 <Route path="/integrations" element={<Integrations />} />
                                 <Route path="/settings" element={<Settings />} />
+                                <Route path="/userprofile" element={<UserProfile />} />
                                 <Route path="/login" element={<Navigate to="/" replace />} />
                             </Routes>
                         </Main>
                     ) : (
                         <Routes>
                             <Route path="/login" element={<Login onLogin={handleLogin} />} />
-                            <Route path="*" element={<Navigate to="/login" replace />} />
                             <Route path="/register" element={<UserRegistration />} />
+                            <Route path="*" element={<Navigate to="/login" replace />} />
                         </Routes>
                     )}
                 </Box>

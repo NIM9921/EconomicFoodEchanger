@@ -78,13 +78,18 @@ export default function PrimarySearchAppBar({ onMenuClick, onLogout }: PrimarySe
         setMobileMoreAnchorEl(null);
     };
 
+    const handleMobileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+        setMobileMoreAnchorEl(event.currentTarget);
+    };
+
     const handleMenuClose = () => {
         setAnchorEl(null);
         handleMobileMenuClose();
     };
 
-    const handleMobileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
-        setMobileMoreAnchorEl(event.currentTarget);
+    const handleProfileClick = () => {
+        navigate('/userprofile');
+        handleMenuClose();
     };
 
     const handleLogout = () => {
@@ -114,7 +119,7 @@ export default function PrimarySearchAppBar({ onMenuClick, onLogout }: PrimarySe
             open={isMenuOpen}
             onClose={handleMenuClose}
         >
-            <MenuItem onClick={handleMenuClose}>Profile</MenuItem>
+            <MenuItem onClick={handleProfileClick}>Profile</MenuItem>
             <MenuItem onClick={handleMenuClose}>My account</MenuItem>
             <MenuItem onClick={handleLogout}>Log Out</MenuItem>
         </Menu>

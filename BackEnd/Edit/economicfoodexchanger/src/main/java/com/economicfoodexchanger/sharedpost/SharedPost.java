@@ -44,6 +44,12 @@ public class SharedPost {
     @Column(name = "createdateandtime")
     private LocalDateTime createdateandtime;
 
+    @Column(name = "complete")
+    boolean Complete;
+
+    @Column(name = "conformed")
+    boolean Conformed;
+
     @ManyToOne
     @JoinColumn(name = "user_id", referencedColumnName = "id")
     private User username;

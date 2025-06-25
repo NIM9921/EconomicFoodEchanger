@@ -66,9 +66,15 @@ interface BitDetail {
 interface BitDealerListTableProps {
     postId?: number;
     bitDetails?: BitDetail[];
+    key?: number; // Add key prop for forcing refresh
+    onBidAccepted?: () => void; // Add callback prop
 }
 
-export default function BitDealerListTable({ postId, bitDetails: propBitDetails }: BitDealerListTableProps) {
+export default function BitDealerListTable({ 
+    postId, 
+    bitDetails: propBitDetails, 
+    onBidAccepted 
+}: BitDealerListTableProps) {
     const [page, setPage] = React.useState(1);
     const [moreInfoOpen, setMoreInfoOpen] = React.useState(false);
     const [selectedDealId, setSelectedDealId] = React.useState<number | null>(null);
@@ -79,27 +85,48 @@ export default function BitDealerListTable({ postId, bitDetails: propBitDetails 
 
     const dealersPerPage = 4;
 
-    // Fetch bit details from API
-    const fetchBitDetails = async () => {
-        if (!postId) {
-            console.warn('fetchBitDetails called without a valid postId');
-            return;
+    // Optimize useEffect to prevent duplicate calls
+    React.useEffect(() => {
+        if (propBitDetails && propBitDetails.length >= 0) {
+            console.log('Using provided bitDetails:', propBitDetails);
+            setBitDetails(propBitDetails);
+            setLoading(false);
+            setPage(1); // Reset to first page when data updates
+        } else if (postId && !propBitDetails) {
+            console.log('Fetching fresh bitDetails from API...');
+            fetchBitDetails();
+        } else {
+            console.log('No bitDetails available');
+            setBitDetails([]);
+            setLoading(false);
         }
+    }, [postId, JSON.stringify(propBitDetails)]); // Use JSON.stringify to prevent unnecessary re-renders
+
+    const fetchBitDetails = async () => {
+        if (!postId) return;
 
         setLoading(true);
         setError('');
 
         try {
             console.log('Fetching bit details for post ID:', postId);
-            const response = await fetch(`http://localhost:8080/bitdetails/getbypostid?postid=${postId}`);
+            
+            const response = await fetch(`${ApiConfig.Domain}/sharedpost/${postId}`);
             
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            const data: BitDetail[] = await response.json();
-            console.log('Fetched bit details:', data);
-            setBitDetails(data);
+            const postData = await response.json();
+            console.log('Fetched post data:', postData);
+            
+            if (postData.bitDetails && Array.isArray(postData.bitDetails)) {
+                setBitDetails(postData.bitDetails);
+                console.log('Bit details found:', postData.bitDetails.length);
+            } else {
+                setBitDetails([]);
+                console.log('No bit details found');
+            }
         } catch (err) {
             console.error('Error fetching bit details:', err);
             setError('Failed to load bid details. Please try again.');
@@ -109,38 +136,7 @@ export default function BitDealerListTable({ postId, bitDetails: propBitDetails 
         }
     };
 
-    // Use prop bitDetails first, then fetch if not available
-    React.useEffect(() => {
-        if (propBitDetails && propBitDetails.length > 0) {
-            console.log('Using provided bitDetails:', propBitDetails);
-            setBitDetails(propBitDetails);
-            setLoading(false);
-        } else if (postId) {
-            console.log('No bitDetails provided, fetching from API...');
-            fetchBitDetails();
-        } else {
-            console.log('No bitDetails available');
-            setBitDetails([]);
-            setLoading(false);
-        }
-    }, [postId, propBitDetails]);
-
-    // Listen for a custom event to refresh bit details
-    React.useEffect(() => {
-        const handler = async (event: CustomEvent) => {
-            if (event.detail && event.detail.newBid) {
-                console.log('append-new-bid event received:', event.detail.newBid);
-                await fetchBitDetails(); // Re-fetch bit details after a new bid is added
-            }
-        };
-        window.addEventListener('append-new-bid', handler as EventListener);
-        return () => window.removeEventListener('append-new-bid', handler as EventListener);
-    }, []);
-
     const pageCount = Math.ceil(bitDetails.length / dealersPerPage);
-    const indexOfLastDealer = page * dealersPerPage;
-    const indexOfFirstDealer = indexOfLastDealer - dealersPerPage;
-    const currentBitDetails = bitDetails.slice(indexOfFirstDealer, indexOfLastDealer);
 
     const handlePageChange = (event: React.ChangeEvent<unknown>, value: number) => {
         setPage(value);
@@ -158,6 +154,60 @@ export default function BitDealerListTable({ postId, bitDetails: propBitDetails 
     const handleMoreInfoClose = () => {
         setMoreInfoOpen(false);
         setSelectedBitDetail(null);
+        setSelectedDealId(null);
+    };
+
+    // Handle when bid is accepted from the MoreInfoDeal dialog
+    const handleBidAccepted = () => {
+        // Refresh the bit details by refetching or calling parent callback
+        if (onBidAccepted) {
+            onBidAccepted();
+        }
+        
+        // Also refresh local data if we have postId
+        if (postId) {
+            fetchBitDetails();
+        }
+        
+        // Close the dialog
+        handleMoreInfoClose();
+    };
+
+    // Get current dealers for pagination
+    const indexOfLastDealer = page * dealersPerPage;
+    const indexOfFirstDealer = indexOfLastDealer - dealersPerPage;
+    const currentBitDetails = bitDetails.slice(indexOfFirstDealer, indexOfLastDealer);
+
+    // Function to get user avatar
+    const getUserAvatar = (user: BitDetail['user']): string => {
+        return `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=4caf50&color=white&size=128`;
+    };
+
+    // Function to get status based on conformedstate
+    const getStatus = (conformedstate: boolean): 'accepted' | 'pending' => {
+        return conformedstate ? 'accepted' : 'pending';
+    };
+
+    // Function to get status color
+    const getStatusColor = (conformedstate: boolean) => {
+        return conformedstate ? 'success' : 'warning';
+    };
+
+    // Add function to check if we're showing filtered results
+    const getDisplayInfo = () => {
+        if (!propBitDetails || propBitDetails.length === 0) {
+            return { showingAll: true, hasAccepted: false, totalBids: 0, acceptedBids: 0 };
+        }
+
+        const totalBids = propBitDetails.length;
+        const acceptedBids = propBitDetails.filter(bid => bid.conformedstate).length;
+        const hasAccepted = acceptedBids > 0;
+        
+        // If all bids are accepted, we're showing all
+        // If some bids are accepted but we have less than total, we're filtering
+        const showingAll = acceptedBids === 0 || acceptedBids === totalBids;
+
+        return { showingAll, hasAccepted, totalBids, acceptedBids };
     };
 
     // Loading skeleton
@@ -223,6 +273,7 @@ export default function BitDealerListTable({ postId, bitDetails: propBitDetails 
                     borderRadius: 2,
                     bgcolor: 'grey.50'
                 }}>
+                    <ShoppingBasketIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
                     <Typography variant="h6" color="text.secondary" gutterBottom>
                         No bids yet
                     </Typography>
@@ -234,12 +285,55 @@ export default function BitDealerListTable({ postId, bitDetails: propBitDetails 
         );
     }
 
+    const displayInfo = getDisplayInfo();
+
     return (
         <>
             <Box sx={{ mt: 2, mb: 2 }}>
-                <Typography variant="h6" sx={{ mb: 2 }}>
-                    Bid Dealer Requests ({bitDetails.length})
-                </Typography>
+                {/* Enhanced header with filtering information */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Typography variant="h6">
+                        Bid Dealer Requests ({bitDetails.length})
+                    </Typography>
+                    
+                    {/* Show filtering status */}
+                    {!displayInfo.showingAll && displayInfo.hasAccepted && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Chip
+                                label="Showing Accepted Only"
+                                color="success"
+                                size="small"
+                                variant="outlined"
+                            />
+                            <Typography variant="caption" color="text.secondary">
+                                ({displayInfo.acceptedBids} accepted of {displayInfo.totalBids} total)
+                            </Typography>
+                        </Box>
+                    )}
+                    
+                    {displayInfo.showingAll && displayInfo.hasAccepted && (
+                        <Chip
+                            label="All Bids Accepted"
+                            color="success"
+                            size="small"
+                        />
+                    )}
+                </Box>
+
+                {/* Add info banner when showing only accepted bids */}
+                {!displayInfo.showingAll && displayInfo.hasAccepted && (
+                    <Alert 
+                        severity="info" 
+                        sx={{ mb: 2 }}
+                        icon={<CheckCircleIcon />}
+                    >
+                        <Typography variant="body2">
+                            <strong>Accepted Bids Only:</strong> This post has accepted bids. 
+                            Only confirmed deals are displayed below.
+                        </Typography>
+                    </Alert>
+                )}
+
                 <Grid container spacing={3}>
                     {currentBitDetails.map((bitDetail) => (
                         <Grid item xs={12} sm={6} md={6} lg={6} key={bitDetail.id}>
@@ -250,32 +344,68 @@ export default function BitDealerListTable({ postId, bitDetails: propBitDetails 
                                     display: 'flex',
                                     flexDirection: 'column',
                                     borderLeft: 4,
-                                    borderColor: bitDetail.conformedstate ? 'success.main' : 'warning.main'
+                                    borderColor: getStatusColor(bitDetail.conformedstate) + '.main',
+                                    // Add special styling for accepted bids
+                                    ...(bitDetail.conformedstate && {
+                                        bgcolor: 'rgba(76, 175, 80, 0.02)',
+                                        boxShadow: '0 4px 12px rgba(76, 175, 80, 0.15)'
+                                    })
                                 }}
                             >
                                 <CardContent sx={{ flexGrow: 1 }}>
                                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
                                             <Avatar
-                                                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(bitDetail.user.name)}&background=4caf50&color=white&size=128`}
+                                                src={getUserAvatar(bitDetail.user)}
                                                 alt={bitDetail.user.name}
-                                                sx={{ width: 50, height: 50, mr: 2 }}
+                                                sx={{ 
+                                                    width: 50, 
+                                                    height: 50, 
+                                                    mr: 2,
+                                                    // Add border for accepted bids
+                                                    ...(bitDetail.conformedstate && {
+                                                        border: '2px solid #4caf50'
+                                                    })
+                                                }}
                                             >
                                                 <PersonIcon />
                                             </Avatar>
                                             <Box>
                                                 <Typography variant="subtitle1" component="div">
                                                     {bitDetail.user.name}
+                                                    {/* Add crown icon for accepted bids */}
+                                                    {bitDetail.conformedstate && (
+                                                        <Chip
+                                                            label="DEAL PARTNER"
+                                                            size="small"
+                                                            color="success"
+                                                            sx={{ ml: 1, fontSize: '0.7rem', height: '20px' }}
+                                                        />
+                                                    )}
                                                 </Typography>
-                                                <Typography variant="body2" color="text.secondary">
-                                                    @{bitDetail.user.username}
-                                                </Typography>
+                                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                    <Rating
+                                                        value={4.0}
+                                                        precision={0.5}
+                                                        size="small"
+                                                        readOnly
+                                                    />
+                                                    <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+                                                        @{bitDetail.user.username}
+                                                    </Typography>
+                                                </Box>
                                             </Box>
                                         </Box>
                                         <Chip
-                                            label={bitDetail.conformedstate ? 'Accepted' : 'Pending'}
-                                            color={bitDetail.conformedstate ? 'success' : 'warning'}
+                                            label={getStatus(bitDetail.conformedstate)}
+                                            color={getStatusColor(bitDetail.conformedstate)}
                                             size="small"
+                                            sx={{
+                                                ...(bitDetail.conformedstate && {
+                                                    fontWeight: 'bold',
+                                                    fontSize: '0.8rem'
+                                                })
+                                            }}
                                         />
                                     </Box>
 
@@ -291,6 +421,7 @@ export default function BitDealerListTable({ postId, bitDetails: propBitDetails 
                                         </Box>
 
                                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                            <ShoppingBasketIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
                                             <Typography variant="body2">
                                                 Quantity: {bitDetail.needamount} kg
                                             </Typography>
@@ -307,11 +438,11 @@ export default function BitDealerListTable({ postId, bitDetails: propBitDetails 
 
                                         {bitDetail.bitdetailscol && (
                                             <Box sx={{ 
-                                                bgcolor: 'grey.100', 
+                                                bgcolor: bitDetail.conformedstate ? 'success.50' : 'grey.100', 
                                                 p: 1, 
                                                 borderRadius: 1,
                                                 border: '1px solid',
-                                                borderColor: 'grey.200'
+                                                borderColor: bitDetail.conformedstate ? 'success.200' : 'grey.200'
                                             }}>
                                                 <Typography variant="caption" color="text.secondary" display="block">
                                                     Contact Details:
@@ -325,21 +456,32 @@ export default function BitDealerListTable({ postId, bitDetails: propBitDetails 
                                 </CardContent>
 
                                 <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
-                                    <Typography variant="caption" color="text.secondary">
-                                        Phone: {bitDetail.user.mobileNumber}
-                                    </Typography>
+                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                        <LocalShippingIcon fontSize="small" sx={{ mr: 0.5, color: 'text.secondary' }} />
+                                        <Typography variant="caption" color="text.secondary">
+                                            Phone: {bitDetail.user.mobileNumber}
+                                        </Typography>
+                                    </Box>
                                     <Button
-                                        variant="contained"
+                                        variant={bitDetail.conformedstate ? "contained" : "outlined"}
+                                        color={bitDetail.conformedstate ? "success" : "primary"}
                                         size="small"
+                                        startIcon={<InfoIcon />}
                                         onClick={() => handleMoreInfoClick(bitDetail.id)}
+                                        sx={{
+                                            ...(bitDetail.conformedstate && {
+                                                fontWeight: 'bold'
+                                            })
+                                        }}
                                     >
-                                        View Details
+                                        {bitDetail.conformedstate ? 'Deal Details' : 'View Details'}
                                     </Button>
                                 </CardActions>
                             </Card>
                         </Grid>
                     ))}
                 </Grid>
+
                 {pageCount > 1 && (
                     <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
                         <Pagination
@@ -359,6 +501,8 @@ export default function BitDealerListTable({ postId, bitDetails: propBitDetails 
                     onClose={handleMoreInfoClose}
                     dealId={selectedDealId}
                     bitDetail={selectedBitDetail}
+                    sharedPostId={postId} // Pass the shared post ID
+                    onBidAccepted={handleBidAccepted} // Pass the callback
                 />
             )}
         </>
