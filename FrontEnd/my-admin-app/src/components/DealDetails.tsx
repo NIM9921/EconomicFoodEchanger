@@ -21,7 +21,7 @@ import TurnedInNotIcon from "@mui/icons-material/TurnedInNot";
 import HandshakeIcon from "@mui/icons-material/Handshake";
 import BitDealerListTable from './BitDealerListTable';
 import LaunchIcon from "@mui/icons-material/Launch";
-import { Alert, Chip, Divider, Grid, Accordion, AccordionSummary, AccordionDetails } from "@mui/material";
+import { Alert, Chip, Divider, Grid, Accordion, AccordionSummary, AccordionDetails, Card, CardContent, Tabs, Tab, MenuItem, FormControlLabel, Switch } from "@mui/material";
 import ApiConfig from '../utils/ApiConfig';
 import {
     Timeline,
@@ -43,7 +43,11 @@ import {
     Home as HomeIcon,
     ExpandMore as ExpandMoreIcon,
     TrackChanges as TrackChangesIcon,
-    Payment as PaymentIcon
+    Payment as PaymentIcon,
+    Upload as UploadIcon,
+    AttachFile as AttachFileIcon,
+    Receipt as ReceiptIcon,
+    Download as DownloadIcon
 } from '@mui/icons-material';
 
 // Remove AutoPlaySwipeableViews to avoid the warning
@@ -162,6 +166,29 @@ interface DeliveryData {
     statusHistory: StatusHistory[];
 }
 
+// Add new interfaces for payment management
+interface ExistingPayment {
+    id: number;
+    amount: number;
+    note: string | null;
+    status: boolean;
+    filetype: string | null;
+    paymentType: {
+        id: number;
+        name: string;
+    };
+}
+
+interface PaymentFormData {
+    paymentid: string; // Add payment ID for updates
+    amount: string;
+    note: string;
+    payment_type_id: string;
+    status: boolean; // Add status field
+    file: File | null;
+    filetype: string;
+}
+
 export default function ScrollDialog({ 
     open = true, 
     setOpen, 
@@ -194,6 +221,41 @@ export default function ScrollDialog({
     const [isSubmittingBid, setIsSubmittingBid] = React.useState(false);
     const [bidError, setBidError] = React.useState('');
     const [bidSuccess, setBidSuccess] = React.useState('');
+
+    // New state for forms
+    const [activeFormTab, setActiveFormTab] = React.useState(0);
+    const [paymentTypes, setPaymentTypes] = React.useState<PaymentType[]>([]);
+
+    // Payment form state
+    const [paymentData, setPaymentData] = React.useState<PaymentFormData>({
+        paymentid: '',
+        amount: '',
+        note: '',
+        payment_type_id: '',
+        status: false,
+        file: null,
+        filetype: ''
+    });
+    const [isSubmittingPayment, setIsSubmittingPayment] = React.useState(false);
+    const [paymentError, setPaymentError] = React.useState('');
+    const [paymentSuccess, setPaymentSuccess] = React.useState('');
+
+    // Delivery status form state
+    const [deliveryStatusData, setDeliveryStatusData] = React.useState<DeliveryStatusFormData>({
+        tracking_number: '',
+        sharedpost_id: postDetails?.id || 0,
+        current_package_location: '',
+        delivery_company: '',
+        description: ''
+    });
+    const [isSubmittingDeliveryStatus, setIsSubmittingDeliveryStatus] = React.useState(false);
+    const [deliveryStatusError, setDeliveryStatusError] = React.useState('');
+    const [deliveryStatusSuccess, setDeliveryStatusSuccess] = React.useState('');
+
+    // Add state for existing payments and form mode
+    const [existingPayments, setExistingPayments] = React.useState<ExistingPayment[]>([]);
+    const [isUpdateMode, setIsUpdateMode] = React.useState(false);
+    const [selectedPaymentId, setSelectedPaymentId] = React.useState<string>('');
 
     // Debug logging
     React.useEffect(() => {
@@ -508,8 +570,22 @@ export default function ScrollDialog({
                 const data: DeliveryData = await response.json();
                 console.log('Fetched delivery data:', data);
                 setDeliveryData(data);
+
+                // Only set payment ID for selection, do not auto-fill the form
+                if (data.payment) {
+                    setSelectedPaymentId(data.payment.id.toString());
+                    setIsUpdateMode(true);
+                    setExistingPayments([{
+                        id: data.payment.id,
+                        amount: data.payment.amount,
+                        note: data.payment.note,
+                        status: data.payment.status,
+                        filetype: data.payment.filetype,
+                        paymentType: data.payment.paymentType
+                    }]);
+                    // Do NOT setPaymentData here
+                }
             } else if (response.status === 404) {
-                // No delivery data available
                 setDeliveryData(null);
             } else {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -758,6 +834,58 @@ export default function ScrollDialog({
         return null;
     }
 
+    // Add function to handle payment file download
+    const handleDownloadPaymentFile = async (paymentId: number) => {
+        try {
+            const response = await fetch(`${ApiConfig.Domain}/payment/file/getbyid?id=${paymentId}`, {
+                method: 'GET',
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to download file: ${response.status} ${response.statusText}`);
+            }
+
+            // Get the file blob
+            const blob = await response.blob();
+            
+            // Get filename from response headers or use default
+            const contentDisposition = response.headers.get('content-disposition');
+            let filename = `payment_receipt_${paymentId}`;
+            
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+                if (filenameMatch) {
+                    filename = filenameMatch[1];
+                }
+            } else {
+                // Determine file extension from content type
+                const contentType = response.headers.get('content-type');
+                if (contentType?.includes('pdf')) {
+                    filename += '.pdf';
+                } else if (contentType?.includes('image')) {
+                    filename += '.jpg';
+                }
+            }
+
+            // Create download link
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+
+            setPaymentSuccess('Payment receipt downloaded successfully!');
+            setTimeout(() => setPaymentSuccess(''), 3000);
+
+        } catch (error) {
+            console.error('Error downloading payment file:', error);
+            setPaymentError(error instanceof Error ? error.message : 'Failed to download payment receipt.');
+        }
+    };
+
     // Add function to filter bids based on acceptance status
     const getFilteredBitDetails = () => {
         if (!postDetails?.bitDetails) {
@@ -775,6 +903,300 @@ export default function ScrollDialog({
         }
     };
 
+    // Check if there are accepted bids
+    const hasAcceptedBids = React.useMemo(() => {
+        return postDetails?.bitDetails?.some(bid => bid.conformedstate) || false;
+    }, [postDetails?.bitDetails]);
+
+    // Fetch payment types on component mount
+    React.useEffect(() => {
+        const fetchPaymentTypes = async () => {
+            try {
+                const response = await fetch(`${ApiConfig.Domain}/payment-types`);
+                if (response.ok) {
+                    const types = await response.json();
+                    setPaymentTypes(types);
+                } else {
+                    // Fallback payment types if API not available
+                    setPaymentTypes([
+                        { id: 1, name: 'Cash' },
+                        { id: 2, name: 'Bank Transfer' },
+                        { id: 3, name: 'Credit Card' },
+                        { id: 4, name: 'Digital Wallet' }
+                    ]);
+                }
+            } catch (error) {
+                console.error('Error fetching payment types:', error);
+                // Fallback payment types
+                setPaymentTypes([
+                    { id: 1, name: 'Cash' },
+                    { id: 2, name: 'Bank Transfer' },
+                    { id: 3, name: 'Credit Card' },
+                    { id: 4, name: 'Digital Wallet' }
+                ]);
+            }
+        };
+
+        fetchPaymentTypes();
+    }, []);
+
+    // Update sharedpost_id when postDetails changes
+    React.useEffect(() => {
+        if (postDetails?.id) {
+            setDeliveryStatusData(prev => ({
+                ...prev,
+                sharedpost_id: postDetails.id
+            }));
+        }
+    }, [postDetails?.id]);
+
+    // Enhanced payment form handlers
+    const handlePaymentInputChange = (field: keyof PaymentFormData, value: string | File | null | boolean) => {
+        setPaymentData(prev => ({
+            ...prev,
+            [field]: value
+        }));
+        setPaymentError('');
+    };
+
+    // Add the missing handleFileChange function
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0] || null;
+        if (file) {
+            const allowedTypes = ['application/pdf', 'image/png', 'image/jpg', 'image/jpeg'];
+            const fileType = file.type;
+            
+            if (!allowedTypes.includes(fileType)) {
+                setPaymentError('Please upload only PDF, PNG, JPG, or JPEG files.');
+                return;
+            }
+
+            const filetype = fileType === 'application/pdf' ? 'pdf' : 
+                           fileType === 'image/png' ? 'png' :
+                           fileType === 'image/jpeg' ? 'jpeg' : 'jpg';
+
+            setPaymentData(prev => ({
+                ...prev,
+                file: file,
+                filetype: filetype
+            }));
+        } else {
+            setPaymentData(prev => ({
+                ...prev,
+                file: null,
+                filetype: ''
+            }));
+        }
+        setPaymentError('');
+    };
+
+    // Function to handle payment selection for update
+    const handlePaymentSelection = (paymentId: string) => {
+        setSelectedPaymentId(paymentId);
+        setPaymentData(prev => ({ ...prev, paymentid: paymentId }));
+        setIsUpdateMode(true);
+        // Only fill the form when user selects a payment
+        const existingPayment = existingPayments.find(p => p.id.toString() === paymentId);
+        if (existingPayment) {
+            setPaymentData({
+                paymentid: paymentId,
+                amount: existingPayment.amount.toString(),
+                note: existingPayment.note || '',
+                payment_type_id: existingPayment.paymentType.id.toString(),
+                status: existingPayment.status,
+                file: null,
+                filetype: existingPayment.filetype || ''
+            });
+        }
+    };
+
+    // Enhanced payment form validation - always require payment ID
+    const validatePaymentForm = (): boolean => {
+        if (!paymentData.paymentid) {
+            setPaymentError('Please select a payment to update.');
+            return false;
+        }
+
+        if (!paymentData.amount || parseFloat(paymentData.amount) <= 0) {
+            setPaymentError('Please enter a valid amount.');
+            return false;
+        }
+        
+        if (!paymentData.note.trim()) {
+            setPaymentError('Please enter a note.');
+            return false;
+        }
+
+        if (!paymentData.payment_type_id) {
+            setPaymentError('Please select a payment type.');
+            return false;
+        }
+
+        return true;
+    };
+
+    // Simplified payment submission function - only for updates
+    const handleSubmitPayment = async () => {
+        if (!validatePaymentForm()) return;
+
+        setIsSubmittingPayment(true);
+        setPaymentError('');
+
+        try {
+            const formData = new FormData();
+            
+            // Always add payment ID since we're always updating
+            formData.append('paymentid', paymentData.paymentid);
+            formData.append('amount', paymentData.amount);
+            formData.append('note', paymentData.note);
+            formData.append('paymentTypeId', paymentData.payment_type_id);
+            formData.append('status', paymentData.status.toString());
+            
+            if (paymentData.file) {
+                formData.append('file', paymentData.file);
+                formData.append('filetype', paymentData.filetype);
+            } else if (paymentData.filetype) {
+                // Keep existing filetype if no new file uploaded
+                formData.append('filetype', paymentData.filetype);
+            }
+
+            // Always use PUT method for updates
+            const endpoint = `${ApiConfig.Domain}/payment/updatepayment`;
+
+            console.log('Updating payment at:', endpoint);
+            console.log('FormData contents:');
+            for (let [key, value] of formData.entries()) {
+                console.log(key, value);
+            }
+
+            const response = await fetch(endpoint, {
+                method: 'PUT',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Payment update failed:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    errorText: errorText
+                });
+                throw new Error(`Failed to update payment: ${response.status} ${response.statusText} - ${errorText}`);
+            }
+
+            setPaymentSuccess('Payment updated successfully!');
+            
+            // Refresh existing payments list
+            // fetchExistingPayments(); // This is now handled in fetchDeliveryData
+
+            setTimeout(() => setPaymentSuccess(''), 3000);
+
+        } catch (error) {
+            console.error('Error updating payment:', error);
+            setPaymentError(error instanceof Error ? error.message : 'Failed to update payment.');
+        } finally {
+            setIsSubmittingPayment(false);
+        }
+    };
+
+    // Debug: Log payment data
+    React.useEffect(() => {
+        console.log('Payment data:', paymentData);
+    }, [paymentData]);
+
+    // Add missing delivery status form handlers
+    const handleDeliveryStatusInputChange = (field: keyof DeliveryStatusFormData, value: string | number) => {
+        setDeliveryStatusData(prev => ({
+            ...prev,
+            [field]: value
+        }));
+        setDeliveryStatusError('');
+    };
+
+    // Validate delivery status form
+    const validateDeliveryStatusForm = (): boolean => {
+        if (!deliveryStatusData.tracking_number.trim()) {
+            setDeliveryStatusError('Please enter a tracking number.');
+            return false;
+        }
+        
+        if (!deliveryStatusData.current_package_location.trim()) {
+            setDeliveryStatusError('Please enter current package location.');
+            return false;
+        }
+
+        if (!deliveryStatusData.delivery_company.trim()) {
+            setDeliveryStatusError('Please enter delivery company.');
+            return false;
+        }
+
+        if (!deliveryStatusData.description.trim()) {
+            setDeliveryStatusError('Please enter a description.');
+            return false;
+        }
+
+        return true;
+    };
+
+    // Submit delivery status form
+    const handleSubmitDeliveryStatus = async () => {
+        if (!validateDeliveryStatusForm()) return;
+
+        setIsSubmittingDeliveryStatus(true);
+        setDeliveryStatusError('');
+
+        try {
+            const response = await fetch(`${ApiConfig.Domain}/delivery-status`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(deliveryStatusData)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Failed to submit delivery status: ${errorText}`);
+            }
+
+            setDeliveryStatusSuccess('Delivery status updated successfully!');
+            
+            // Reset form
+            setDeliveryStatusData({
+                tracking_number: '',
+                sharedpost_id: postDetails?.id || 0,
+                current_package_location: '',
+                delivery_company: '',
+                description: ''
+            });
+
+            // Refresh delivery data
+            fetchDeliveryData();
+
+            setTimeout(() => setDeliveryStatusSuccess(''), 3000);
+
+        } catch (error) {
+            console.error('Error submitting delivery status:', error);
+            setDeliveryStatusError(error instanceof Error ? error.message : 'Failed to submit delivery status.');
+        } finally {
+            setIsSubmittingDeliveryStatus(false);
+        }
+    };
+
+    // Add missing interfaces at the top of the file
+    interface PaymentType {
+        id: number;
+        name: string;
+    }
+
+    interface DeliveryStatusFormData {
+        tracking_number: string;
+        sharedpost_id: number;
+        current_package_location: string;
+        delivery_company: string;
+        description: string;
+    }
+
     return (
         <Dialog
             open={isOpen}
@@ -784,7 +1206,7 @@ export default function ScrollDialog({
             aria-describedby="scroll-dialog-description"
             maxWidth="md"
             fullWidth
-            disableEscapeKeyDown={isSubmittingBid}
+            disableEscapeKeyDown={isSubmittingBid || isSubmittingPayment || isSubmittingDeliveryStatus}
         >
             {/* Fix the HTML nesting issue in DialogTitle */}
             <DialogTitle id="scroll-dialog-title" sx={{ p: 2 }}>
@@ -1016,140 +1438,581 @@ export default function ScrollDialog({
                     )}
                 </Box>
 
-                {/* Enhanced Bid Form */}
-                <Box sx={{ mt: 4, mb: 3 }}>
-                    <Typography variant="h6" gutterBottom fontWeight="bold" sx={{ mb: 3 }}>
-                        🤝 Place Your Bid
-                    </Typography>
+                {/* Conditionally render forms based on accepted bids */}
+                {hasAcceptedBids ? (
+                    /* Payment and Delivery Status Forms */
+                    <Box sx={{ mt: 4, mb: 3 }}>
+                        <Typography variant="h6" gutterBottom fontWeight="bold" sx={{ mb: 3 }}>
+                            📋 Deal Management
+                        </Typography>
 
-                    {/* Success Message */}
-                    {bidSuccess && (
-                        <Alert severity="success" sx={{ mb: 3 }}>
-                            {bidSuccess}
-                        </Alert>
-                    )}
-
-                    {/* Error Message */}
-                    {bidError && (
-                        <Alert severity="error" sx={{ mb: 3 }}>
-                            {bidError}
-                        </Alert>
-                    )}
-
-                    <Box
-                        component="form"
-                        sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            width: "100%",
-                            gap: 3,
-                        }}
-                        noValidate
-                        autoComplete="off"
-                    >
-                        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
-                            <TextField
-                                label="Price Per Unit (LKR)"
-                                type="number"
-                                variant="outlined"
-                                value={bidData.bitrate}
-                                onChange={(e) => handleBidInputChange('bitrate', e.target.value)}
-                                placeholder="Enter your price per unit"
-                                required
-                                disabled={isSubmittingBid}
-                                inputProps={{ min: 0, step: 0.01 }}
-                                sx={{ width: "48%" }}
-                                helperText="Enter the rate you're willing to pay/receive per unit"
-                            />
-                            
-                            <TextField
-                                label="Quantity Needed"
-                                type="number"
-                                variant="outlined"
-                                value={bidData.needamount}
-                                onChange={(e) => handleBidInputChange('needamount', e.target.value)}
-                                placeholder="Enter quantity"
-                                required
-                                disabled={isSubmittingBid}
-                                inputProps={{ min: 0, step: 0.01 }}
-                                sx={{ width: "48%" }}
-                                helperText="How much quantity do you need?"
-                            />
-                        </Box>
-
-                        <TextField
-                            label="Delivery Location"
-                            variant="outlined"
-                            value={bidData.deliverylocation}
-                            onChange={(e) => handleBidInputChange('deliverylocation', e.target.value)}
-                            placeholder="Enter preferred delivery location (optional)"
-                            disabled={isSubmittingBid}
-                            helperText="Where would you like the delivery? (Optional)"
-                            fullWidth
-                        />
-                        
-                        <TextField
-                            label="Contact Details & Special Notes"
-                            placeholder="Enter your contact number and any special requirements..."
-                            multiline
-                            rows={3}
-                            variant="outlined"
-                            value={bidData.bitdetailscol}
-                            onChange={(e) => handleBidInputChange('bitdetailscol', e.target.value)}
-                            required
-                            disabled={isSubmittingBid}
-                            helperText="Provide your contact details and any special instructions"
-                            fullWidth
-                        />
-
-                        <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 2 }}>
-                            <Button 
-                                variant="outlined" 
-                                onClick={() => {
-                                    setBidData({
-                                        bitrate: '',
-                                        needamount: '',
-                                        bitdetailscol: '',
-                                        deliverylocation: ''
-                                    });
-                                    setBidError('');
-                                    setBidSuccess('');
+                        {/* Tabs for Payment and Delivery Status */}
+                        <Card sx={{ mb: 3 }}>
+                            <Tabs
+                                value={activeFormTab}
+                                onChange={(_, newValue) => setActiveFormTab(newValue)}
+                                variant="fullWidth"
+                                sx={{
+                                    '& .MuiTab-root': {
+                                        textTransform: 'none',
+                                        fontWeight: 'bold'
+                                    }
                                 }}
-                                disabled={isSubmittingBid}
-                                sx={{ minWidth: 100 }}
                             >
-                                Clear
-                            </Button>
+                                <Tab 
+                                    label={
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <ReceiptIcon />
+                                            Payment Information
+                                        </Box>
+                                    }
+                                />
+                                <Tab 
+                                    label={
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <LocalShippingIcon />
+                                            Delivery Status
+                                        </Box>
+                                    }
+                                />
+                            </Tabs>
+
+                            <CardContent>
+                                {/* Payment Form */
+                                activeFormTab === 0 && (
+                                    <Box>
+                                        <Typography variant="h6" gutterBottom>
+                                            💳 Payment Information
+                                        </Typography>
+
+                                        <Alert severity="info" sx={{ mb: 3 }}>
+                                            <Typography variant="body2">
+                                                <strong>Payment Update:</strong> Payment records are automatically created when deals are confirmed. 
+                                                Update the payment information below.
+                                            </Typography>
+                                        </Alert>
+
+                                        {paymentSuccess && (
+                                            <Alert severity="success" sx={{ mb: 3 }}>
+                                                {paymentSuccess}
+                                            </Alert>
+                                        )}
+
+                                        {paymentError && (
+                                            <Alert severity="error" sx={{ mb: 3 }}>
+                                                {paymentError}
+                                            </Alert>
+                                        )}
+
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                            {/* Show payment info if auto-populated */}
+                                            {deliveryData?.payment && (
+                                                <Box sx={{ 
+                                                    p: 2, 
+                                                    bgcolor: 'rgba(33, 150, 243, 0.05)', 
+                                                    borderRadius: 2,
+                                                    border: '1px solid rgba(33, 150, 243, 0.2)'
+                                                }}>
+                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                                                        <Typography variant="subtitle2" fontWeight="bold">
+                                                            Current Payment Record
+                                                        </Typography>
+                                                        {/* Download Receipt Button - Show if file exists */}
+                                                        {(deliveryData.payment.filetype || deliveryData.payment.file) && (
+                                                            <Button
+                                                                variant="outlined"
+                                                                size="small"
+                                                                startIcon={<DownloadIcon />}
+                                                                onClick={() => handleDownloadPaymentFile(deliveryData.payment.id)}
+                                                                sx={{
+                                                                    ml: 2,
+                                                                    minWidth: 'auto',
+                                                                    px: 2,
+                                                                    fontSize: '0.75rem',
+                                                                    borderColor: '#1976d2',
+                                                                    color: '#1976d2',
+                                                                    '&:hover': {
+                                                                        borderColor: '#115293',
+                                                                        bgcolor: 'rgba(25, 118, 210, 0.04)'
+                                                                    }
+                                                                }}
+                                                            >
+                                                                Download Receipt
+                                                            </Button>
+                                                        )}
+                                                        
+                                                        {/* Debug info - remove this in production */}
+                                                        {process.env.NODE_ENV === 'development' && (
+                                                            <Typography variant="caption" sx={{ ml: 2, color: 'orange' }}>
+                                                                Debug: filetype={deliveryData.payment.filetype || 'null'}, 
+                                                                file={deliveryData.payment.file || 'null'}
+                                                            </Typography>
+                                                        )}
+                                                    </Box>
+                                                    
+                                                    <Typography variant="body2">
+                                                        <strong>Payment ID:</strong> {deliveryData.payment.id}
+                                                    </Typography>
+                                                    <Typography variant="body2">
+                                                        <strong>Current Amount:</strong> Rs. {deliveryData.payment.amount.toFixed(2)}
+                                                    </Typography>
+                                                    <Typography variant="body2">
+                                                        <strong>Status:</strong> {deliveryData.payment.status ? 'Paid' : 'Pending'}
+                                                    </Typography>
+                                                    <Typography variant="body2">
+                                                        <strong>Payment Type:</strong> {deliveryData.payment.paymentType.name}
+                                                    </Typography>
+                                                    {deliveryData.payment.note && (
+                                                        <Typography variant="body2">
+                                                            <strong>Note:</strong> {deliveryData.payment.note}
+                                                        </Typography>
+                                                    )}
+                                                    
+                                                    {/* Enhanced file availability indicator */}
+                                                    {(deliveryData.payment.filetype || deliveryData.payment.file) ? (
+                                                        <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                                                            <Typography variant="body2">
+                                                                <strong>Receipt:</strong> {deliveryData.payment.filetype?.toUpperCase() || 'File'} available
+                                                            </Typography>
+                                                            <Chip
+                                                                label="Download Available"
+                                                                color="success"
+                                                                size="small"
+                                                                icon={<AttachFileIcon />}
+                                                                onClick={() => handleDownloadPaymentFile(deliveryData.payment.id)}
+                                                                sx={{ cursor: 'pointer' }}
+                                                            />
+                                                            
+                                                            {/* Alternative download link */}
+                                                            <Button
+                                                                size="small"
+                                                                variant="text"
+                                                                startIcon={<DownloadIcon />}
+                                                                onClick={() => handleDownloadPaymentFile(deliveryData.payment.id)}
+                                                                sx={{ 
+                                                                    minWidth: 'auto',
+                                                                    fontSize: '0.7rem',
+                                                                    p: 0.5
+                                                                }}
+                                                            >
+                                                                Download
+                                                            </Button>
+                                                        </Box>
+                                                    ) : (
+                                                        <Box sx={{ mt: 1 }}>
+                                                            <Chip
+                                                                label="No Receipt Uploaded"
+                                                                color="default"
+                                                                size="small"
+                                                                variant="outlined"
+                                                            />
+                                                        </Box>
+                                                    )}
+                                                </Box>
+                                            )}
+
+                                            {/* Payment form fields - only show if payment is selected */}
+                                            {selectedPaymentId && (
+                                                <>
+                                                    <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                                                        <TextField
+                                                            label="Amount (LKR)"
+                                                            type="number"
+                                                            variant="outlined"
+                                                            value={paymentData.amount}
+                                                            onChange={(e) => handlePaymentInputChange('amount', e.target.value)}
+                                                            required
+                                                            disabled={isSubmittingPayment}
+                                                            inputProps={{ min: 0, step: 0.01 }}
+                                                            sx={{ width: "48%" }}
+                                                            helperText="Enter the payment amount"
+                                                        />
+                                                        
+                                                        <TextField
+                                                            select
+                                                            label="Payment Type"
+                                                            value={paymentData.payment_type_id}
+                                                            onChange={(e) => handlePaymentInputChange('payment_type_id', e.target.value)}
+                                                            required
+                                                            disabled={isSubmittingPayment}
+                                                            sx={{ width: "48%" }}
+                                                            helperText="Select payment method"
+                                                        >
+                                                            {paymentTypes.map((type) => (
+                                                                <MenuItem key={type.id} value={type.id.toString()}>
+                                                                    {type.name}
+                                                                </MenuItem>
+                                                            ))}
+                                                        </TextField>
+                                                    </Box>
+
+                                                    {/* Payment Status Toggle */}
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                                        <Typography variant="body2">Payment Status:</Typography>
+                                                        <FormControlLabel
+                                                            control={
+                                                                <Switch
+                                                                    checked={paymentData.status}
+                                                                    onChange={(e) => handlePaymentInputChange('status', e.target.checked)}
+                                                                    disabled={isSubmittingPayment}
+                                                                    color="success"
+                                                                />
+                                                            }
+                                                            label={paymentData.status ? 'Paid' : 'Pending'}
+                                                        />
+                                                    </Box>
+
+                                                    <TextField
+                                                        label="Payment Note"
+                                                        multiline
+                                                        rows={3}
+                                                        variant="outlined"
+                                                        value={paymentData.note}
+                                                        onChange={(e) => handlePaymentInputChange('note', e.target.value)}
+                                                        required
+                                                        disabled={isSubmittingPayment}
+                                                        helperText="Add payment details or reference number"
+                                                        fullWidth
+                                                    />
+
+                                                    <Box>
+                                                        <Typography variant="subtitle2" gutterBottom>
+                                                            Payment Receipt {paymentData.filetype ? '(Update File)' : '(Upload File)'}
+                                                        </Typography>
+                                                        {/* Show current file info */}
+                                                        {paymentData.filetype && !paymentData.file && (
+                                                            <Alert severity="info" sx={{ mb: 2 }}>
+                                                                Current file type: {paymentData.filetype.toUpperCase()}. 
+                                                                Upload a new file to replace it.
+                                                            </Alert>
+                                                        )}
+                                                        
+                                                        <Box sx={{ 
+                                                            border: '2px dashed #ccc', 
+                                                            borderRadius: 2, 
+                                                            p: 3, 
+                                                            textAlign: 'center',
+                                                            bgcolor: 'grey.50'
+                                                        }}>
+                                                            <input
+                                                                accept=".pdf,.png,.jpg,.jpeg"
+                                                                style={{ display: 'none' }}
+                                                                id="payment-file-upload"
+                                                                type="file"
+                                                                onChange={handleFileChange}
+                                                                disabled={isSubmittingPayment}
+                                                            />
+                                                            <label htmlFor="payment-file-upload">
+                                                                <Button
+                                                                    variant="outlined"
+                                                                    component="span"
+                                                                    startIcon={<UploadIcon />}
+                                                                    disabled={isSubmittingPayment}
+                                                                >
+                                                                    {paymentData.filetype ? 'Update Receipt' : 'Upload Receipt'}
+                                                                </Button>
+                                                            </label>
+                                                            {paymentData.file && (
+                                                                <Box sx={{ mt: 2 }}>
+                                                                    <Chip
+                                                                        icon={<AttachFileIcon />}
+                                                                        label={`${paymentData.file.name} (${paymentData.filetype})`}
+                                                                        onDelete={() => handlePaymentInputChange('file', null)}
+                                                                        color="primary"
+                                                                    />
+                                                                </Box>
+                                                            )}
+                                                            <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+                                                                Supported formats: PDF, PNG, JPG, JPEG (Max 10MB)
+                                                            </Typography>
+                                                        </Box>
+                                                    </Box>
+
+                                                    <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+                                                        <Button
+                                                            variant="outlined"
+                                                            onClick={() => {
+                                                                // Reset to original payment data instead of clearing completely
+                                                                if (deliveryData?.payment) {
+                                                                    setPaymentData({
+                                                                        paymentid: deliveryData.payment.id.toString(),
+                                                                        amount: deliveryData.payment.amount.toString(),
+                                                                        note: deliveryData.payment.note || '',
+                                                                        payment_type_id: deliveryData.payment.paymentType.id.toString(),
+                                                                        status: deliveryData.payment.status,
+                                                                        file: null,
+                                                                        filetype: deliveryData.payment.filetype || ''
+                                                                    });
+                                                                }
+                                                                setPaymentError('');
+                                                                setPaymentSuccess('');
+                                                            }}
+                                                            disabled={isSubmittingPayment}
+                                                        >
+                                                            Reset
+                                                        </Button>
+                                                        <Button
+                                                            variant="contained"
+                                                            color="primary"
+                                                            onClick={handleSubmitPayment}
+                                                            disabled={isSubmittingPayment}
+                                                            startIcon={<ReceiptIcon />}
+                                                        >
+                                                            {isSubmittingPayment ? 'Updating...' : 'Update Payment'}
+                                                        </Button>
+                                                    </Box>
+                                                </>
+                                            )}
+
+                                            {/* Show message if no delivery data available */
+                                            !deliveryData?.payment && !deliveryLoading && (
+                                                <Alert severity="warning">
+                                                    No payment record found. Payment records are created automatically when deals are confirmed and delivery is set up.
+                                                </Alert>
+                                            )}
+                                        </Box>
+                                    </Box>
+                                )}
+
+                                {/* Delivery Status Form */}
+                                {activeFormTab === 1 && (
+                                    <Box>
+                                        <Typography variant="h6" gutterBottom>
+                                            🚚 Delivery Status Update
+                                        </Typography>
+
+                                        {deliveryStatusSuccess && (
+                                            <Alert severity="success" sx={{ mb: 3 }}>
+                                                {deliveryStatusSuccess}
+                                            </Alert>
+                                        )}
+
+                                        {deliveryStatusError && (
+                                            <Alert severity="error" sx={{ mb: 3 }}>
+                                                {deliveryStatusError}
+                                            </Alert>
+                                        )}
+
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                                                <TextField
+                                                    label="Tracking Number"
+                                                    variant="outlined"
+                                                    value={deliveryStatusData.tracking_number}
+                                                    onChange={(e) => handleDeliveryStatusInputChange('tracking_number', e.target.value)}
+                                                    required
+                                                    disabled={isSubmittingDeliveryStatus}
+                                                    sx={{ width: "48%" }}
+                                                    helperText="Enter package tracking number"
+                                                />
+
+                                                <TextField
+                                                    label="Delivery Company"
+                                                    variant="outlined"
+                                                    value={deliveryStatusData.delivery_company}
+                                                    onChange={(e) => handleDeliveryStatusInputChange('delivery_company', e.target.value)}
+                                                    required
+                                                    disabled={isSubmittingDeliveryStatus}
+                                                    sx={{ width: "48%" }}
+                                                    helperText="Name of delivery service"
+                                                />
+                                            </Box>
+
+                                            <TextField
+                                                label="Current Package Location"
+                                                variant="outlined"
+                                                value={deliveryStatusData.current_package_location}
+                                                onChange={(e) => handleDeliveryStatusInputChange('current_package_location', e.target.value)}
+                                                required
+                                                disabled={isSubmittingDeliveryStatus}
+                                                helperText="Where is the package currently located?"
+                                                fullWidth
+                                            />
+
+                                            <TextField
+                                                label="Description"
+                                                multiline
+                                                rows={3}
+                                                variant="outlined"
+                                                value={deliveryStatusData.description}
+                                                onChange={(e) => handleDeliveryStatusInputChange('description', e.target.value)}
+                                                required
+                                                disabled={isSubmittingDeliveryStatus}
+                                                helperText="Additional delivery details or status update"
+                                                fullWidth
+                                            />
+
+                                            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+                                                <Button
+                                                    variant="outlined"
+                                                    onClick={() => {
+                                                        setDeliveryStatusData({
+                                                            tracking_number: '',
+                                                            sharedpost_id: postDetails?.id || 0,
+                                                            current_package_location: '',
+                                                            delivery_company: '',
+                                                            description: ''
+                                                        });
+                                                        setDeliveryStatusError('');
+                                                        setDeliveryStatusSuccess('');
+                                                    }}
+                                                    disabled={isSubmittingDeliveryStatus}
+                                                >
+                                                    Clear
+                                                </Button>
+                                                <Button
+                                                    variant="contained"
+                                                    color="success"
+                                                    onClick={handleSubmitDeliveryStatus}
+                                                    disabled={isSubmittingDeliveryStatus}
+                                                    startIcon={<LocalShippingIcon />}
+                                                >
+                                                    {isSubmittingDeliveryStatus ? 'Updating...' : 'Update Status'}
+                                                </Button>
+                                            </Box>
+                                        </Box>
+                                    </Box>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </Box>
+                ) : (
+                    /* Original Bid Form - Only show when no accepted bids */
+                    <Box sx={{ mt: 4, mb: 3 }}>
+                        <Typography variant="h6" gutterBottom fontWeight="bold" sx={{ mb: 3 }}>
+                            🤝 Place Your Bid
+                        </Typography>
+
+                        {/* Success Message */}
+                        {bidSuccess && (
+                            <Alert severity="success" sx={{ mb: 3 }}>
+                                {bidSuccess}
+                            </Alert>
+                        )}
+
+                        {/* Error Message */}
+                        {bidError && (
+                            <Alert severity="error" sx={{ mb: 3 }}>
+                                {bidError}
+                            </Alert>
+                        )}
+
+                        <Box
+                            component="form"
+                            sx={{
+                                display: "flex",
+                                flexDirection: "column",
+                                width: "100%",
+                                gap: 3,
+                            }}
+                            noValidate
+                            autoComplete="off"
+                        >
+                            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
+                                <TextField
+                                    label="Price Per Unit (LKR)"
+                                    type="number"
+                                    variant="outlined"
+                                    value={bidData.bitrate}
+                                    onChange={(e) => handleBidInputChange('bitrate', e.target.value)}
+                                    placeholder="Enter your price per unit"
+                                    required
+                                    disabled={isSubmittingBid}
+                                    inputProps={{ min: 0, step: 0.01 }}
+                                    sx={{ width: "48%" }}
+                                    helperText="Enter the rate you're willing to pay/receive per unit"
+                                />
+                                
+                                <TextField
+                                    label="Quantity Needed"
+                                    type="number"
+                                    variant="outlined"
+                                    value={bidData.needamount}
+                                    onChange={(e) => handleBidInputChange('needamount', e.target.value)}
+                                    placeholder="Enter quantity"
+                                    required
+                                    disabled={isSubmittingBid}
+                                    inputProps={{ min: 0, step: 0.01 }}
+                                    sx={{ width: "48%" }}
+                                    helperText="How much quantity do you need?"
+                                />
+                            </Box>
+
+                            <TextField
+                                label="Delivery Location"
+                                variant="outlined"
+                                value={bidData.deliverylocation}
+                                onChange={(e) => handleBidInputChange('deliverylocation', e.target.value)}
+                                placeholder="Enter preferred delivery location (optional)"
+                                disabled={isSubmittingBid}
+                                helperText="Where would you like the delivery? (Optional)"
+                                fullWidth
+                            />
                             
-                            <Button 
-                                variant="contained" 
-                                color="success"
-                                onClick={handleSubmitBid}
+                            <TextField
+                                label="Contact Details & Special Notes"
+                                placeholder="Enter your contact number and any special requirements..."
+                                multiline
+                                rows={3}
+                                variant="outlined"
+                                value={bidData.bitdetailscol}
+                                onChange={(e) => handleBidInputChange('bitdetailscol', e.target.value)}
+                                required
                                 disabled={isSubmittingBid}
-                                startIcon={<HandshakeIcon />}
-                                sx={{ minWidth: 150 }}
-                            >
-                                {isSubmittingBid ? 'Submitting...' : 'Submit Bid'}
-                            </Button>
+                                helperText="Provide your contact details and any special instructions"
+                                fullWidth
+                            />
+
+                            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 2 }}>
+                                <Button 
+                                    variant="outlined" 
+                                    onClick={() => {
+                                        setBidData({
+                                            bitrate: '',
+                                            needamount: '',
+                                            bitdetailscol: '',
+                                            deliverylocation: ''
+                                        });
+                                        setBidError('');
+                                        setBidSuccess('');
+                                    }}
+                                    disabled={isSubmittingBid}
+                                    sx={{ minWidth: 100 }}
+                                >
+                                    Clear
+                                </Button>
+                                
+                                <Button 
+                                    variant="contained" 
+                                    color="success"
+                                    onClick={handleSubmitBid}
+                                    disabled={isSubmittingBid}
+                                    startIcon={<HandshakeIcon />}
+                                    sx={{ minWidth: 150 }}
+                                >
+                                    {isSubmittingBid ? 'Submitting...' : 'Submit Bid'}
+                                </Button>
+                            </Box>
                         </Box>
                     </Box>
-                </Box>
+                )}
 
                 <Box sx={{ mt: 3, mb: 2 }}>
                     <BitDealerListTable 
                         postId={postDetails?.id} 
-                        bitDetails={getFilteredBitDetails()} // Now this function is defined
+                        bitDetails={getFilteredBitDetails()}
                         key={refreshBids}
                         onBidAccepted={handleBidAccepted}
                     />
                 </Box>
             </DialogContent>
+
             <DialogActions>
                 <Button 
                     onClick={handleClose}
-                    disabled={isSubmittingBid}
+                    disabled={isSubmittingBid || isSubmittingPayment || isSubmittingDeliveryStatus}
                 >
-                    {isSubmittingBid ? 'Submitting...' : 'Cancel'}
+                    Close
                 </Button>
             </DialogActions>
         </Dialog>
