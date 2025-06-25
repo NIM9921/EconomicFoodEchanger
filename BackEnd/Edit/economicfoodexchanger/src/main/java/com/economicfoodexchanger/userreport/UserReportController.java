@@ -61,7 +61,7 @@ public class UserReportController {
     }
 
     @GetMapping("/sharedpostComparsion")
-    public LinkedHashSet<String> shredPostComparisonDetails(){
+    public LinkedHashSet<String> getSharedPostComparisonDetails(){
         Optional<User> user = userDao.findById(1);
 
         LinkedHashSet<String> uniqueTitles = new LinkedHashSet<>();
@@ -71,14 +71,14 @@ public class UserReportController {
             });
         }
 
-        return  uniqueTitles;
+        return uniqueTitles;
     }
 
     @GetMapping("/recent-items")
     public List<RecentItem> getRecentItems() {
         try {
             // Get user shared post titles
-            LinkedHashSet<String> userItems = shredPostComparisonDetails();
+            LinkedHashSet<String> userItems = getSharedPostComparisonDetails();
             
             // Get CSV data
             byte[] csvData = csvController.getLatestCsvFile();

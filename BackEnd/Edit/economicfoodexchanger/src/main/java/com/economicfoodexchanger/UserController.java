@@ -97,16 +97,19 @@ public class UserController {
     public String getUserRoleByUserId() {
         Optional<User> user = userDao.findById(1);
         if (user.isPresent()) {
-
             List<Role> roles = user.get().getRoleList();
             if (!roles.isEmpty()) {
                 return roles.get(0).getName();
             }
-        } else {
-            return "User not found";
         }
         return "User not found";
     }
 
+    @GetMapping("/getbyid")
+    public User getUserById(Integer id) {
+
+        Optional<User> user = userDao.findById(1);
+        return user.orElse(null);
+    }
 
 }

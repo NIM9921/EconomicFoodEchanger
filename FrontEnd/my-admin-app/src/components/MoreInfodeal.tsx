@@ -18,7 +18,9 @@ import {
     IconButton,
     Stack,
     Rating,
-    Paper
+    Paper,
+    Alert,
+    CircularProgress
 } from '@mui/material';
 import {
     Close as CloseIcon,
@@ -34,6 +36,7 @@ import {
     Schedule as ScheduleIcon,
     ContactPhone as ContactPhoneIcon
 } from '@mui/icons-material';
+import ApiConfig from '../utils/ApiConfig';
 
 // Interface for bit details from API
 interface BitDetail {
@@ -77,9 +80,23 @@ interface MoreInfoDealProps {
     onClose: () => void;
     dealId: number;
     bitDetail?: BitDetail;
+    sharedPostId?: number; // Add sharedPostId prop
+    onBidAccepted?: () => void; // Add callback for when bid is accepted
 }
 
-export default function MoreInfoDeal({ open, onClose, dealId, bitDetail }: MoreInfoDealProps) {
+export default function MoreInfoDeal({ 
+    open, 
+    onClose, 
+    dealId, 
+    bitDetail, 
+    sharedPostId,
+    onBidAccepted 
+}: MoreInfoDealProps) {
+    // Add state for handling accept bid operation
+    const [isAccepting, setIsAccepting] = useState(false);
+    const [acceptError, setAcceptError] = useState<string>('');
+    const [acceptSuccess, setAcceptSuccess] = useState<string>('');
+
     // Function to get user avatar
     const getUserAvatar = (user: BitDetail['user']): string => {
         return `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=4caf50&color=white&size=128`;
@@ -95,6 +112,101 @@ export default function MoreInfoDeal({ open, onClose, dealId, bitDetail }: MoreI
         return conformedstate 
             ? { label: 'Accepted', color: 'success' as const, icon: <CheckCircleIcon /> }
             : { label: 'Pending', color: 'warning' as const, icon: <ScheduleIcon /> };
+    };
+
+    // Function to handle accepting the bid
+    const handleAcceptBid = async () => {
+        if (!bitDetail || !sharedPostId) {
+            setAcceptError('Missing required information to accept bid');
+            return;
+        }
+
+        setIsAccepting(true);
+        setAcceptError('');
+        setAcceptSuccess('');
+
+        try {
+            // Get the delivery location from the bid details
+            const deliveryLocation = bitDetail.deliverylocation || bitDetail.user.city;
+
+            const requestBody = {
+                location: deliveryLocation
+            };
+
+            console.log('Accepting bid with data:', {
+                bitId: bitDetail.id,
+                sharedPostId: sharedPostId,
+                requestBody
+            });
+
+            const response = await fetch(
+                `${ApiConfig.Domain}/sharedpost/updatebitconfirmation?bitid=${bitDetail.id}&sharedpostid=${sharedPostId}`,
+                {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestBody)
+                }
+            );
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Failed to accept bid: ${errorText}`);
+            }
+
+            // Handle both JSON and text responses
+            let result;
+            const contentType = response.headers.get('content-type');
+            
+            if (contentType && contentType.includes('application/json')) {
+                result = await response.json();
+                console.log('Bid accepted successfully (JSON):', result);
+            } else {
+                result = await response.text();
+                console.log('Bid accepted successfully (Text):', result);
+            }
+
+            setAcceptSuccess('Bid accepted successfully! The deal has been confirmed.');
+            
+            // Call the callback to refresh the parent data
+            if (onBidAccepted) {
+                onBidAccepted();
+            }
+
+            // Auto-close after 2 seconds
+            setTimeout(() => {
+                onClose();
+            }, 2000);
+
+        } catch (error) {
+            console.error('Error accepting bid:', error);
+            setAcceptError(error instanceof Error ? error.message : 'Failed to accept bid. Please try again.');
+        } finally {
+            setIsAccepting(false);
+        }
+    };
+
+    // Function to handle rejecting the bid
+    const handleRejectBid = async () => {
+        if (!bitDetail) {
+            setAcceptError('Missing bid information');
+            return;
+        }
+
+        setIsAccepting(true);
+        setAcceptError('');
+
+        try {
+            // You can implement reject functionality here if needed
+            // For now, just show a message
+            setAcceptError('Reject functionality not implemented yet');
+        } catch (error) {
+            console.error('Error rejecting bid:', error);
+            setAcceptError('Failed to reject bid');
+        } finally {
+            setIsAccepting(false);
+        }
     };
 
     if (!bitDetail) {
@@ -137,21 +249,41 @@ export default function MoreInfoDeal({ open, onClose, dealId, bitDetail }: MoreI
                     py: 2
                 }}
             >
-                <Typography variant="h6" fontWeight="bold">
+                <Box
+                    component="span"
+                    sx={{
+                        fontSize: '1.25rem',
+                        fontWeight: 600,
+                        lineHeight: 1.6
+                    }}
+                >
                     Bid Details - #{dealId}
-                </Typography>
+                </Box>
                 <IconButton
                     onClick={onClose}
                     sx={{ 
                         color: 'white',
                         '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
                     }}
+                    disabled={isAccepting}
                 >
                     <CloseIcon />
                 </IconButton>
             </DialogTitle>
 
             <DialogContent sx={{ p: 3 }}>
+                {/* Success/Error Messages */}
+                {acceptSuccess && (
+                    <Alert severity="success" sx={{ mb: 3 }}>
+                        {acceptSuccess}
+                    </Alert>
+                )}
+                {acceptError && (
+                    <Alert severity="error" sx={{ mb: 3 }}>
+                        {acceptError}
+                    </Alert>
+                )}
+
                 <Grid container spacing={3}>
                     {/* Bidder Information */}
                     <Grid item xs={12} md={6}>
@@ -267,6 +399,22 @@ export default function MoreInfoDeal({ open, onClose, dealId, bitDetail }: MoreI
                                         </Box>
                                     )}
 
+                                    {/* Highlight the delivery location that will be used for the API call */}
+                                    <Paper sx={{ p: 2, bgcolor: 'success.50', border: '1px solid', borderColor: 'success.200' }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                                            <LocationOnIcon sx={{ mr: 1, color: 'success.main' }} />
+                                            <Typography variant="subtitle2" fontWeight="bold">
+                                                Delivery Address
+                                            </Typography>
+                                        </Box>
+                                        <Typography variant="body2">
+                                            {bitDetail.deliverylocation || bitDetail.user.city}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                            This location will be used for delivery confirmation
+                                        </Typography>
+                                    </Paper>
+
                                     {bitDetail.bitdetailscol && (
                                         <Paper sx={{ p: 2, bgcolor: 'info.50', border: '1px solid', borderColor: 'info.200' }}>
                                             <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
@@ -375,6 +523,7 @@ export default function MoreInfoDeal({ open, onClose, dealId, bitDetail }: MoreI
                     variant="outlined"
                     onClick={onClose}
                     sx={{ minWidth: 100 }}
+                    disabled={isAccepting}
                 >
                     Close
                 </Button>
@@ -384,15 +533,20 @@ export default function MoreInfoDeal({ open, onClose, dealId, bitDetail }: MoreI
                             variant="outlined"
                             color="error"
                             sx={{ minWidth: 100 }}
+                            onClick={handleRejectBid}
+                            disabled={isAccepting}
                         >
-                            Reject
+                            {isAccepting ? <CircularProgress size={20} /> : 'Reject'}
                         </Button>
                         <Button
                             variant="contained"
                             color="success"
                             sx={{ minWidth: 100 }}
+                            onClick={handleAcceptBid}
+                            disabled={isAccepting}
+                            startIcon={isAccepting ? <CircularProgress size={20} color="inherit" /> : <CheckCircleIcon />}
                         >
-                            Accept Bid
+                            {isAccepting ? 'Accepting...' : 'Accept Bid'}
                         </Button>
                     </>
                 )}
