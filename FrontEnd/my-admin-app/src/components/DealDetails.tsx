@@ -1365,7 +1365,7 @@ export default function ScrollDialog({
                             </Typography>
                         </Box>
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                            <strong>Address:</strong> {postDetails.user.address}
+                            <strong>User Address:</strong> {postDetails.user.address}
                         </Typography>
                         {/* Display coordinates if available */}
                         {postDetails.user.latitude && postDetails.user.longitude && (
@@ -1426,7 +1426,7 @@ export default function ScrollDialog({
                     {postDetails?.user?.latitude && postDetails?.user?.longitude ? (
                         <Box sx={{ mb: 2 }}>
                             <Typography variant="body2" color="success.main" sx={{ mb: 1 }}>
-                                ✅ Showing exact location: {postDetails.user.latitude.toFixed(6)}, {postDetails.user.longitude.toFixed(6)}
+                                ✅ Showing Items exact location: {postDetails.user.latitude.toFixed(6)}, {postDetails.user.longitude.toFixed(6)}
                             </Typography>
                         </Box>
                     ) : (
@@ -1450,7 +1450,8 @@ export default function ScrollDialog({
                     
                     {postDetails?.user?.address && (
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
-                            📍 {postDetails.user.address}
+                            {/*📍 {postDetails.user.address}*/}
+                            Item Location
                         </Typography>
                     )}
                 </Box>
