@@ -3,6 +3,7 @@ package com.economicfoodexchanger.story;
 
 import com.economicfoodexchanger.UserDao;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -32,7 +33,7 @@ public class ShareStoryController {
 
     @GetMapping("/all")
     public List<ShareStory> getAll() {
-        return shareStoryDao.findAll();
+        return shareStoryDao.findAll(Sort.by(Sort.Direction.DESC, "createdateandtime"));
 
     }
 
