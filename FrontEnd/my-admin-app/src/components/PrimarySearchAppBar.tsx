@@ -210,7 +210,7 @@ export default function PrimarySearchAppBar({ onMenuClick, onLogout }: PrimarySe
                     </Search>
                     <Box sx={{ flexGrow: 1 }} />
                     <Box sx={{ display: { xs: 'none', md: 'flex' } }}>
-                        <IconButton size="large" aria-label="show 4 new mails" color="inherit">
+{/*                        <IconButton size="large" aria-label="show 4 new mails" color="inherit">
                             <Badge badgeContent={4} color="error">
                                 <MailIcon />
                             </Badge>
@@ -223,7 +223,7 @@ export default function PrimarySearchAppBar({ onMenuClick, onLogout }: PrimarySe
                             <Badge badgeContent={17} color="error">
                                 <NotificationsIcon />
                             </Badge>
-                        </IconButton>
+                        </IconButton>*/}
                         <IconButton
                             size="large"
                             edge="end"
