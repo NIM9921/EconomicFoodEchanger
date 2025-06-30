@@ -31,6 +31,7 @@ import {
 } from '@mui/icons-material';
 import { Link } from 'react-router-dom';
 import ApiConfig from '../utils/ApiConfig';
+import UserReportCharts from './charts/UserReportCharts';
 
 // Define interface for user report data
 interface UserReportData {
@@ -515,6 +516,11 @@ export default function Dashboard() {
 
             {/* Main Dashboard Content - Mobile Responsive Layout */}
             <Grid container spacing={isMobile ? 2 : 3}>
+                {/* Charts Section - Full Width */}
+                <Grid item xs={12}>
+                    <UserReportCharts />
+                </Grid>
+
                 {/* Quick Actions */}
                 <Grid item xs={12} md={4}>
                     <StyledCard>
