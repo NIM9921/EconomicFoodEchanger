@@ -6,6 +6,7 @@ import com.economicfoodexchanger.UserController;
 import com.economicfoodexchanger.UserDao;
 import com.economicfoodexchanger.csvhandling.CsvController;
 import com.economicfoodexchanger.sharedpost.SharedPostController;
+import com.economicfoodexchanger.sharedpost.SharedPostDao;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +37,10 @@ public class UserReportController {
     @Autowired
     UserController userController;
 
+    @Autowired
+    SharedPostDao sharedPostDao;
+
+
     //http://localhost:8080/userreport
     @GetMapping
     public HashMap<String,String> UserReport() {
@@ -60,6 +65,17 @@ public class UserReportController {
         return userReport;
     }
 
+    @GetMapping("/getSellingRequestProfit")
+    public List<SharedPostDao.ProfitProjection> getSellingRequestProfit(){
+        return sharedPostDao.getSellingRequestProfit();
+    }
+
+    @GetMapping("/getBuyingRequestCost")
+    public List<SharedPostDao.CostProjection> getBuyingRequestCost(){
+        return sharedPostDao.getBuyingRequestCost();
+    }
+
+    //http://localhost:8080/userreport/sharedpostComparsion
     @GetMapping("/sharedpostComparsion")
     public LinkedHashSet<String> getSharedPostComparisonDetails(){
         Optional<User> user = userDao.findById(1);
@@ -73,7 +89,7 @@ public class UserReportController {
 
         return uniqueTitles;
     }
-
+    //http://localhost:8080/userreport/recent-items
     @GetMapping("/recent-items")
     public List<RecentItem> getRecentItems() {
         try {
