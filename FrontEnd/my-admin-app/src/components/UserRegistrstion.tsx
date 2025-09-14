@@ -140,6 +140,13 @@ export default function UserRegistration() {
             return false;
         }
 
+        // NIC validation - Sri Lankan NIC format
+        const nicRegex = /^(([5,6,7,8,9]{1})([0-9]{1})([0,1,2,3,5,6,7,8]{1})([0-9]{6})([v|V|x|X]))|(([1,2]{1})([0,9]{1})([0-9]{2})([0,1,2,3,5,6,7,8]{1})([0-9]{7}))$/;
+        if (!nicRegex.test(nic)) {
+            setError('Please enter a valid Sri Lankan NIC number (e.g., 912345678V or 199212345678)');
+            return false;
+        }
+
         // Community member validation if checkbox is checked
         if (isCommunityMember) {
             if (!communityFirstName || !communityLastName || !communityEmail || 
@@ -156,6 +163,12 @@ export default function UserRegistration() {
 
             if (!phoneRegex.test(communityMobileNumber)) {
                 setError('Please enter a valid mobile number for community member');
+                return false;
+            }
+
+            // Validate community member NIC as well
+            if (!nicRegex.test(communityNic)) {
+                setError('Please enter a valid Sri Lankan NIC number for community member (e.g., 912345678V or 199212345678)');
                 return false;
             }
         }
@@ -371,6 +384,7 @@ export default function UserRegistration() {
                                     variant="outlined"
                                     value={nic}
                                     onChange={(e) => setNic(e.target.value)}
+                                    placeholder="e.g., 912345678V or 199212345678"
                                     InputProps={{
                                         startAdornment: (
                                             <InputAdornment position="start">
@@ -379,6 +393,7 @@ export default function UserRegistration() {
                                         ),
                                     }}
                                     sx={inputStyle}
+                                    helperText="Enter Sri Lankan NIC (Old: 9 digits + V/X, New: 12 digits)"
                                 />
 
                                 <TextField
@@ -661,6 +676,7 @@ export default function UserRegistration() {
                                             variant="outlined"
                                             value={communityNic}
                                             onChange={(e) => setCommunityNic(e.target.value)}
+                                            placeholder="e.g., 912345678V or 199212345678"
                                             InputProps={{
                                                 startAdornment: (
                                                     <InputAdornment position="start">
@@ -669,6 +685,7 @@ export default function UserRegistration() {
                                                 ),
                                             }}
                                             sx={inputStyle}
+                                            helperText="Enter Sri Lankan NIC"
                                         />
 
                                         <TextField
